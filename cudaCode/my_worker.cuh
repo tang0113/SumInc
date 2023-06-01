@@ -55,5 +55,8 @@ namespace tjn{
     */
     __device__
     bool isChange_pr(float delta, int verticesNum);
+
+    __device__
+    void pr_singleNode(int index);
 }
 #endif

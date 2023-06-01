@@ -68,28 +68,29 @@ namespace tjn{
     if(index < end_d - start_d){
       // float delta = atomicExch(&deltas_d[index], 0);
       if(isChange_pr(deltas_d[index], end_d - start_d)){
-        atomicAdd(&values_d[index], deltas_d[index]);
-        // values_d[index] += deltas_d[index];
-        // __syncthreads();
-        // __threadfence();
-        float delta = atomicExch(&deltas_d[index], 0);
-        // __syncthreads();
-        // __threadfence();
-        // atomicAdd(&values_d[index], delta);
-        // atomicAdd(&values_d[index], delta);
-        // values_d[index] += delta;
-        // values_d[index] += delta;
-        unsigned int out_degree = max(size_d[index],1);
-        // atomicExch(&deltas_d[index], 0);
-        // __syncthreads();
-        // __threadfence();
-          float outv = delta * 0.85f / out_degree;
-          for(unsigned int i=curOff_d[index];i<curOff_d[index] + size_d[index];i++){
-            // deltas_d[ oeoffset_d[i] ] += outv;
-            atomicAdd(&deltas_d[oeoffset_d[i]],outv);
-          } 
-          // __syncthreads();
-          // __threadfence();
+        pr_singleNode(index);
+        // atomicAdd(&values_d[index], deltas_d[index]);
+        // // values_d[index] += deltas_d[index];
+        // // __syncthreads();
+        // // __threadfence();
+        // float delta = atomicExch(&deltas_d[index], 0);
+        // // __syncthreads();
+        // // __threadfence();
+        // // atomicAdd(&values_d[index], delta);
+        // // atomicAdd(&values_d[index], delta);
+        // // values_d[index] += delta;
+        // // values_d[index] += delta;
+        // unsigned int out_degree = max(size_d[index],1);
+        // // atomicExch(&deltas_d[index], 0);
+        // // __syncthreads();
+        // // __threadfence();
+        // float outv = delta * 0.85f / out_degree;
+        // for(unsigned int i=curOff_d[index];i<curOff_d[index] + size_d[index];i++){
+        //   // deltas_d[ oeoffset_d[i] ] += outv;
+        //   atomicAdd(&deltas_d[oeoffset_d[i]],outv);
+        // } 
+        // // __syncthreads();
+        // // __threadfence();
           
         
       }else{
@@ -158,43 +159,47 @@ namespace tjn{
   void g_function_compr_real(){
     int index = threadIdx.x + blockIdx.x * blockDim.x;
     if(index < end_d - start_d){
-      switch(node_type_d[index]){
-        case NodeType::SingleNode:
-          {
-            
-          }
-          break;
-        case NodeType::OnlyInNode:
-          {
+      if(isChange_pr(deltas_d[index], end_d - start_d)){
+        switch(node_type_d[index]){
+          case NodeType::SingleNode:
+            {
+              pr_singleNode(index);
+            }
+            break;
+          case NodeType::OnlyInNode:
+            {
+              
+            }
+            break;
+          case NodeType::OnlyOutNode:
+            {
 
-          }
-          break;
-        case NodeType::OnlyOutNode:
-          {
+            }
+            break;
+          case NodeType::BothOutInNode:
+            {
 
-          }
-          break;
-        case NodeType::BothOutInNode:
-          {
+            }
+            {
 
-          }
-          {
+            }
+            break;
+          case NodeType::OutMaster:
+            {
 
-          }
-          break;
-        case NodeType::OutMaster:
-          {
+            }
+            break;
+          case NodeType::BothOutInMaster:
+            {
 
-          }
-          break;
-        case NodeType::BothOutInMaster:
-          {
+            }
+            {
 
-          }
-          {
-
-          }
-          break;
+            }
+            break;
+        }
+      }else{
+        return ;
       }
     }else{
       return ;
@@ -210,4 +215,25 @@ namespace tjn{
     }
   }
 
+  /**
+   * @brief 顶点类型为SingleNode时，为Ingress时也使用此函数
+  */
+  __device__
+  inline void pr_singleNode(int index){
+
+    atomicAdd(&values_d[index], deltas_d[index]);
+
+    float delta = atomicExch(&deltas_d[index], 0);
+
+    unsigned int out_degree = max(size_d[index],1);
+
+    float outv = delta * 0.85f / out_degree;
+
+    for(unsigned int i=curOff_d[index];i<curOff_d[index] + size_d[index];i++){
+
+      atomicAdd(&deltas_d[oeoffset_d[i]],outv);
+
+    } 
+
+  }
 }

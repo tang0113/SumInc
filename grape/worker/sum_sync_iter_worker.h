@@ -585,6 +585,8 @@ class SumSyncIterWorker : public ParallelEngine {
     }
     value_t *deltas_d;
     value_t *values_d;
+    value_t *bound_node_values_d;
+    value_t *spnode_datas_d;
     vid_t *oeoffset_d, *oeoffset_h = (vid_t *)malloc(sizeof(vid_t)  * offsize);
     char *node_type_d, *node_type_h = (char *)malloc(sizeof(char) * num);
     cudaSetDevice(0);
@@ -593,13 +595,19 @@ class SumSyncIterWorker : public ParallelEngine {
     cudaMalloc(&oeoffset_d, sizeof(vid_t) * offsize);
     cudaMalloc(&curOff_d, sizeof(vid_t) * num);
     cudaMalloc(&size_d, sizeof(vid_t) * num);
-    cudaMalloc(&node_type_d, sizeof(char) * num);//压缩， 顶点类型
-
+    bool free_need = false;
+    if(compr_stage){//启用压缩，则分配内存
+      free_need = true;
+      cudaMalloc(&node_type_d, sizeof(char) * num);//压缩， 顶点类型
+      cudaMalloc(&bound_node_values_d, sizeof(value_t) * bound_node_values.size());//给bound_node分配内存
+      cudaMalloc(&spnode_datas_d, sizeof(value_t) * spnode_datas.size());//给spnode分配内存
+    }
+    
     // check();
     int curIndex = 0;
     memset(node_type_h, 0, num);
     for(int i = 0; i < num; i++){
-      if(compr_stage)
+      if(compr_stage)//启用压缩时node_type才有效
         node_type_h[i] = node_type[i];
       for(int j = 0;j < size_h[i]; j++){
           oeoffset_h[curIndex++] = oeoffset[i][j].neighbor.GetValue();
@@ -609,12 +617,15 @@ class SumSyncIterWorker : public ParallelEngine {
 
     deltas.fake2buffer();
     values.fake2buffer();
-
+    bound_node_values.fake2buffer();
+    spnode_datas.fake2buffer();
     //将要用到的数据进行传输
     cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * offsize, cudaMemcpyHostToDevice);
     cudaMemcpy(curOff_d, curOff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
     cudaMemcpy(deltas_d, deltas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
     cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * bound_node_values.size(), cudaMemcpyHostToDevice);
+    cudaMemcpy(spnode_datas_d, spnode_datas.data_buffer, sizeof(value_t) * spnode_datas.size(), cudaMemcpyHostToDevice);
     cudaMemcpy(size_d, size_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
     cudaMemcpy(node_type_d, node_type_h, sizeof(char) * num, cudaMemcpyHostToDevice);
     // check();
@@ -1361,8 +1372,13 @@ class SumSyncIterWorker : public ParallelEngine {
     cudaFree(oeoffset_d);
     cudaFree(curOff_d);
     cudaFree(size_d);
-    cudaFree(node_type_d);
-    
+    if(free_need){
+      LOG(INFO) << "compress=1--Start Releasing Memory!";
+      cudaFree(node_type_d);
+      cudaFree(bound_node_values_d);
+      cudaFree(spnode_datas_d);
+      free_need = false;
+    }
     // Analysis result
     double d_sum = 0;
     vertex_t source;
