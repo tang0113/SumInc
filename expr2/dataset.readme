@@ -1,0 +1,29 @@
+uk-2002:
+  max_out_degree=2449 max_out_id=15578255
+  max_in_degree=194942 max_in_id=14832
+uk-2005:
+  max_out_degree=5213 max_out_id=21608483
+  max_in_degree=1776852 max_in_id=210930
+europe_osm:
+  max_out_degree=10 max_out_id=44499591
+  max_in_degree=12 max_in_id=37989696
+road_usa:
+  max_out_degree=8 max_out_id=16651563
+  max_in_degree=8 max_in_id=338714
+arabic-2005:
+  max_out_degree=9905 max_out_id=3184732
+  max_in_degree=575601 max_in_id=5
+it-2004:
+  max_out_degree=9964 max_out_id=2164462 
+  max_in_degree=1326744 max_in_id=1585886
+gsh-2015-tpd:
+  max_out_degree=526113 max_out_id=6792
+  max_in_degree=2174929 max_in_id=47
+sk-2005:
+  max_out_degree=12869 max_out_id=20454802
+  max_in_degree=8563806 max_in_id=4254
+webbase-2001:
+  max_out_degree=3841 max_out_id=87541572
+  max_in_degree=816127 max_in_id=23741
+
+max_degree_id=[15578255 21608483 44499591 16651563 3184732 2164462 6792 20454802 87541572]

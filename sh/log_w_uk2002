@@ -1,0 +1,44 @@
+
+
+
+2022-03-09 09:03:28
+
+295157956 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base
+edge_num=295157956 
+LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+Number of workers : 16
+Bad input file
+./run_graphbolt.sh: line 58: 20234 Aborted                 LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+
+
+
+2022-03-09 09:05:31
+
+295157956 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base
+edge_num=295157956 
+LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/SSSP -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+Number of workers : 16
+Bad input file
+./run_graphbolt.sh: line 58: 20640 Aborted                 LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/SSSP -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+
+
+
+2022-03-09 09:12:06
+
+295157956 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base
+edge_num=295157956 
+LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/SSSP -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+Number of workers : 16
+Bad input file
+./run_graphbolt.sh: line 58: 28274 Aborted                 LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/SSSP -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+
+
+
+2022-03-09 09:18:34
+
+295157956 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base
+edge_num=295157956 
+LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code/GraphBolt/apps/SSSP -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+Number of workers : 16
+Bad input file
+./run_graphbolt.sh: line 58: 36543 Aborted                 LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code/GraphBolt/apps/SSSP -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj

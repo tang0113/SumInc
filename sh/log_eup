@@ -1,0 +1,183 @@
+
+
+
+2022-03-08 22:44:31
+
+925944045 /mnt2/neu/yusong/dataset/large/uk-2005/0.0001/uk-2005.base
+edge_num=925944045 
+LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 925944045 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2005/0.0001/uk-2005.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2005/0.0001/uk-2005.base.adj
+Number of workers : 16
+Graph created
+Initializing engine ....
+Number of batches: 1
+Creating dependency structure ....
+Initializing dependency structure ....
+Finished initializing engine
+(Excluded) Diff sum: 0.150000
+(Excluded) Diff sum: 0.127500
+(Excluded) Diff sum: 0.108375
+(Excluded) Diff sum: 0.092119
+(Excluded) Diff sum: 0.078301
+(Excluded) Diff sum: 0.066556
+(Excluded) Diff sum: 0.056572
+(Excluded) Diff sum: 0.048087
+(Excluded) Diff sum: 0.040874
+(Excluded) Diff sum: 0.034743
+(Excluded) Diff sum: 0.029531
+(Excluded) Diff sum: 0.025101
+(Excluded) Diff sum: 0.021336
+(Excluded) Diff sum: 0.018136
+(Excluded) Diff sum: 0.015415
+(Excluded) Diff sum: 0.013103
+(Excluded) Diff sum: 0.011138
+(Excluded) Diff sum: 0.009467
+(Excluded) Diff sum: 0.008047
+(Excluded) Diff sum: 0.006840
+(Excluded) Diff sum: 0.005814
+(Excluded) Diff sum: 0.004942
+(Excluded) Diff sum: 0.004201
+(Excluded) Diff sum: 0.003570
+(Excluded) Diff sum: 0.003035
+(Excluded) Diff sum: 0.002580
+(Excluded) Diff sum: 0.002193
+(Excluded) Diff sum: 0.001864
+(Excluded) Diff sum: 0.001584
+(Excluded) Diff sum: 0.001347
+(Excluded) Diff sum: 0.001145
+(Excluded) Diff sum: 0.000973
+(Excluded) Diff sum: 0.000827
+(Excluded) Diff sum: 0.000703
+(Excluded) Diff sum: 0.000597
+(Excluded) Diff sum: 0.000508
+(Excluded) Diff sum: 0.000432
+(Excluded) Diff sum: 0.000367
+(Excluded) Diff sum: 0.000312
+(Excluded) Diff sum: 0.000265
+(Excluded) Diff sum: 0.000225
+(Excluded) Diff sum: 0.000192
+(Excluded) Diff sum: 0.000163
+(Excluded) Diff sum: 0.000138
+(Excluded) Diff sum: 0.000118
+(Excluded) Diff sum: 0.000100
+(Excluded) Diff sum: 0.000085
+(Excluded) Diff sum: 0.000072
+(Excluded) Diff sum: 0.000061
+(Excluded) Diff sum: 0.000052
+(Excluded) Diff sum: 0.000044
+(Excluded) Diff sum: 0.000038
+(Excluded) Diff sum: 0.000032
+(Excluded) Diff sum: 0.000027
+(Excluded) Diff sum: 0.000023
+(Excluded) Diff sum: 0.000020
+(Excluded) Diff sum: 0.000017
+(Excluded) Diff sum: 0.000014
+(Excluded) Diff sum: 0.000012
+(Excluded) Diff sum: 0.000010
+(Excluded) Diff sum: 0.000009
+(Excluded) Diff sum: 0.000007
+(Excluded) Diff sum: 0.000006
+(Excluded) Diff sum: 0.000005
+(Excluded) Diff sum: 0.000005
+(Excluded) Diff sum: 0.000004
+(Excluded) Diff sum: 0.000003
+(Excluded) Diff sum: 0.000003
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+Initial graph processing : 124.323070
+Number of iterations : 75
+
+Opening Stream: Waiting for writer to open...
+Stream opened
+Current_batch: 1
+Batch Size: 925944045
+WARNING: Not enough edges to fulfill batch size. Only 93636 edges read.
+Reading Time : 0.063538
+Edge deletion time : 0.042003
+Edge addition time : 0.019219
+Edge Additions in batch: 46818
+Edge Deletions in batch: 46818
+(Excluded) Diff sum: 0.150000
+(Excluded) Diff sum: 0.127500
+(Excluded) Diff sum: 0.108375
+(Excluded) Diff sum: 0.092119
+(Excluded) Diff sum: 0.078301
+(Excluded) Diff sum: 0.066556
+(Excluded) Diff sum: 0.056572
+(Excluded) Diff sum: 0.048087
+(Excluded) Diff sum: 0.040874
+(Excluded) Diff sum: 0.034743
+(Excluded) Diff sum: 0.029531
+(Excluded) Diff sum: 0.025101
+(Excluded) Diff sum: 0.021336
+(Excluded) Diff sum: 0.018136
+(Excluded) Diff sum: 0.015415
+(Excluded) Diff sum: 0.013103
+(Excluded) Diff sum: 0.011138
+(Excluded) Diff sum: 0.009467
+(Excluded) Diff sum: 0.008047
+(Excluded) Diff sum: 0.006840
+(Excluded) Diff sum: 0.005814
+(Excluded) Diff sum: 0.004942
+(Excluded) Diff sum: 0.004201
+(Excluded) Diff sum: 0.003570
+(Excluded) Diff sum: 0.003035
+(Excluded) Diff sum: 0.002580
+(Excluded) Diff sum: 0.002193
+(Excluded) Diff sum: 0.001864
+(Excluded) Diff sum: 0.001584
+(Excluded) Diff sum: 0.001347
+(Excluded) Diff sum: 0.001145
+(Excluded) Diff sum: 0.000973
+(Excluded) Diff sum: 0.000827
+(Excluded) Diff sum: 0.000703
+(Excluded) Diff sum: 0.000597
+(Excluded) Diff sum: 0.000508
+(Excluded) Diff sum: 0.000432
+(Excluded) Diff sum: 0.000367
+(Excluded) Diff sum: 0.000312
+(Excluded) Diff sum: 0.000265
+(Excluded) Diff sum: 0.000225
+(Excluded) Diff sum: 0.000192
+(Excluded) Diff sum: 0.000163
+(Excluded) Diff sum: 0.000138
+(Excluded) Diff sum: 0.000118
+(Excluded) Diff sum: 0.000100
+(Excluded) Diff sum: 0.000085
+(Excluded) Diff sum: 0.000072
+(Excluded) Diff sum: 0.000061
+(Excluded) Diff sum: 0.000052
+(Excluded) Diff sum: 0.000044
+(Excluded) Diff sum: 0.000038
+(Excluded) Diff sum: 0.000032
+(Excluded) Diff sum: 0.000027
+(Excluded) Diff sum: 0.000023
+(Excluded) Diff sum: 0.000020
+(Excluded) Diff sum: 0.000017
+(Excluded) Diff sum: 0.000014
+(Excluded) Diff sum: 0.000012
+(Excluded) Diff sum: 0.000010
+(Excluded) Diff sum: 0.000009
+(Excluded) Diff sum: 0.000007
+(Excluded) Diff sum: 0.000006
+(Excluded) Diff sum: 0.000005
+(Excluded) Diff sum: 0.000005
+(Excluded) Diff sum: 0.000004
+(Excluded) Diff sum: 0.000003
+(Excluded) Diff sum: 0.000003
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+Finished batch : 101.413215
+Number of iterations : 75
+
+Hit Max Batch Size
+Mem: 62310 MB

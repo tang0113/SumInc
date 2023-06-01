@@ -1,0 +1,227 @@
+
+
+
+2022-03-08 22:00:12
+
+295157956 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base
+edge_num=295157956 
+LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+Number of workers : 16
+Unable to open file: /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+./run_graphbolt.sh: line 57:  3540 Aborted                 LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+
+
+
+2022-03-08 22:02:00
+
+295157956 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base
+edge_num=295157956 
+LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+Number of workers : 16
+Bad input file
+./run_graphbolt.sh: line 57:  3959 Aborted                 LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+
+
+
+2022-03-08 22:08:06
+
+295157956 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base
+edge_num=295157956 
+LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+Number of workers : 16
+Bad input file
+./run_graphbolt.sh: line 57: 42290 Aborted                 LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+
+
+
+2022-03-08 22:09:34
+
+295157956 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base
+edge_num=295157956 
+LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+Number of workers : 16
+Unable to open file: /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+./run_graphbolt.sh: line 57: 47606 Aborted                 LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002_w.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002_w.base.adj
+
+
+
+2022-03-08 22:17:31
+
+295157956 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002.base
+edge_num=295157956 
+LD_PRELOAD=/mnt2/neu/yusong/code/GraphBolt/lib/mimalloc/out/release/libmimalloc.so /mnt2/neu/yusong/code_test/GraphBolt/apps/PageRank -numberOfUpdateBatches 1 -nEdges 295157956 -maxIters 100 -streamPath /mnt2/neu/yusong/dataset/large//uk-2002/0.0001/uk-2002.update -source=0 -nWorkers 16 /mnt2/neu/yusong/dataset/large/uk-2002/0.0001/uk-2002.base.adj
+Number of workers : 16
+Graph created
+Initializing engine ....
+Number of batches: 1
+Creating dependency structure ....
+Initializing dependency structure ....
+Finished initializing engine
+(Excluded) Diff sum: 0.150000
+(Excluded) Diff sum: 0.127500
+(Excluded) Diff sum: 0.108375
+(Excluded) Diff sum: 0.092119
+(Excluded) Diff sum: 0.078301
+(Excluded) Diff sum: 0.066556
+(Excluded) Diff sum: 0.056572
+(Excluded) Diff sum: 0.048087
+(Excluded) Diff sum: 0.040874
+(Excluded) Diff sum: 0.034743
+(Excluded) Diff sum: 0.029531
+(Excluded) Diff sum: 0.025101
+(Excluded) Diff sum: 0.021336
+(Excluded) Diff sum: 0.018136
+(Excluded) Diff sum: 0.015415
+(Excluded) Diff sum: 0.013103
+(Excluded) Diff sum: 0.011138
+(Excluded) Diff sum: 0.009467
+(Excluded) Diff sum: 0.008047
+(Excluded) Diff sum: 0.006840
+(Excluded) Diff sum: 0.005814
+(Excluded) Diff sum: 0.004942
+(Excluded) Diff sum: 0.004201
+(Excluded) Diff sum: 0.003570
+(Excluded) Diff sum: 0.003035
+(Excluded) Diff sum: 0.002580
+(Excluded) Diff sum: 0.002193
+(Excluded) Diff sum: 0.001864
+(Excluded) Diff sum: 0.001584
+(Excluded) Diff sum: 0.001347
+(Excluded) Diff sum: 0.001145
+(Excluded) Diff sum: 0.000973
+(Excluded) Diff sum: 0.000827
+(Excluded) Diff sum: 0.000703
+(Excluded) Diff sum: 0.000597
+(Excluded) Diff sum: 0.000508
+(Excluded) Diff sum: 0.000432
+(Excluded) Diff sum: 0.000367
+(Excluded) Diff sum: 0.000312
+(Excluded) Diff sum: 0.000265
+(Excluded) Diff sum: 0.000225
+(Excluded) Diff sum: 0.000192
+(Excluded) Diff sum: 0.000163
+(Excluded) Diff sum: 0.000138
+(Excluded) Diff sum: 0.000118
+(Excluded) Diff sum: 0.000100
+(Excluded) Diff sum: 0.000085
+(Excluded) Diff sum: 0.000072
+(Excluded) Diff sum: 0.000061
+(Excluded) Diff sum: 0.000052
+(Excluded) Diff sum: 0.000044
+(Excluded) Diff sum: 0.000038
+(Excluded) Diff sum: 0.000032
+(Excluded) Diff sum: 0.000027
+(Excluded) Diff sum: 0.000023
+(Excluded) Diff sum: 0.000020
+(Excluded) Diff sum: 0.000017
+(Excluded) Diff sum: 0.000014
+(Excluded) Diff sum: 0.000012
+(Excluded) Diff sum: 0.000010
+(Excluded) Diff sum: 0.000009
+(Excluded) Diff sum: 0.000007
+(Excluded) Diff sum: 0.000006
+(Excluded) Diff sum: 0.000005
+(Excluded) Diff sum: 0.000005
+(Excluded) Diff sum: 0.000004
+(Excluded) Diff sum: 0.000003
+(Excluded) Diff sum: 0.000003
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+Initial graph processing : 15.271338
+Number of iterations : 75
+
+Opening Stream: Waiting for writer to open...
+Stream opened
+Current_batch: 1
+Batch Size: 295157956
+WARNING: Not enough edges to fulfill batch size. Only 29810 edges read.
+Reading Time : 0.020976
+Edge deletion time : 0.018099
+Edge addition time : 0.009949
+Edge Additions in batch: 14905
+Edge Deletions in batch: 14905
+(Excluded) Diff sum: 0.150000
+(Excluded) Diff sum: 0.127500
+(Excluded) Diff sum: 0.108375
+(Excluded) Diff sum: 0.092119
+(Excluded) Diff sum: 0.078301
+(Excluded) Diff sum: 0.066556
+(Excluded) Diff sum: 0.056572
+(Excluded) Diff sum: 0.048087
+(Excluded) Diff sum: 0.040874
+(Excluded) Diff sum: 0.034743
+(Excluded) Diff sum: 0.029531
+(Excluded) Diff sum: 0.025101
+(Excluded) Diff sum: 0.021336
+(Excluded) Diff sum: 0.018136
+(Excluded) Diff sum: 0.015415
+(Excluded) Diff sum: 0.013103
+(Excluded) Diff sum: 0.011138
+(Excluded) Diff sum: 0.009467
+(Excluded) Diff sum: 0.008047
+(Excluded) Diff sum: 0.006840
+(Excluded) Diff sum: 0.005814
+(Excluded) Diff sum: 0.004942
+(Excluded) Diff sum: 0.004201
+(Excluded) Diff sum: 0.003570
+(Excluded) Diff sum: 0.003035
+(Excluded) Diff sum: 0.002580
+(Excluded) Diff sum: 0.002193
+(Excluded) Diff sum: 0.001864
+(Excluded) Diff sum: 0.001584
+(Excluded) Diff sum: 0.001347
+(Excluded) Diff sum: 0.001145
+(Excluded) Diff sum: 0.000973
+(Excluded) Diff sum: 0.000827
+(Excluded) Diff sum: 0.000703
+(Excluded) Diff sum: 0.000597
+(Excluded) Diff sum: 0.000508
+(Excluded) Diff sum: 0.000432
+(Excluded) Diff sum: 0.000367
+(Excluded) Diff sum: 0.000312
+(Excluded) Diff sum: 0.000265
+(Excluded) Diff sum: 0.000225
+(Excluded) Diff sum: 0.000192
+(Excluded) Diff sum: 0.000163
+(Excluded) Diff sum: 0.000138
+(Excluded) Diff sum: 0.000118
+(Excluded) Diff sum: 0.000100
+(Excluded) Diff sum: 0.000085
+(Excluded) Diff sum: 0.000072
+(Excluded) Diff sum: 0.000061
+(Excluded) Diff sum: 0.000052
+(Excluded) Diff sum: 0.000044
+(Excluded) Diff sum: 0.000038
+(Excluded) Diff sum: 0.000032
+(Excluded) Diff sum: 0.000027
+(Excluded) Diff sum: 0.000023
+(Excluded) Diff sum: 0.000020
+(Excluded) Diff sum: 0.000017
+(Excluded) Diff sum: 0.000014
+(Excluded) Diff sum: 0.000012
+(Excluded) Diff sum: 0.000010
+(Excluded) Diff sum: 0.000009
+(Excluded) Diff sum: 0.000007
+(Excluded) Diff sum: 0.000006
+(Excluded) Diff sum: 0.000005
+(Excluded) Diff sum: 0.000005
+(Excluded) Diff sum: 0.000004
+(Excluded) Diff sum: 0.000003
+(Excluded) Diff sum: 0.000003
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000002
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+(Excluded) Diff sum: 0.000001
+Finished batch : 12.938068
+Number of iterations : 75
+
+Hit Max Batch Size
+Mem: 29191 MB
