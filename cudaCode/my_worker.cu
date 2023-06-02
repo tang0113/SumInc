@@ -43,21 +43,41 @@ namespace tjn{
     //     // printf("numis %d\n", size);
     // }
   }
-  void init(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_oe_d, unsigned int start_d, unsigned int end_d, unsigned int *cur_oeoff_d, char *node_type_d){
-    init_real<<<1,1>>>(spnode_datas_d, bound_node_values_d, deltas_d, values_d, oeoffset_d, size_oe_d, start_d, end_d, cur_oeoff_d, node_type_d);
+  void init(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, 
+            unsigned int *oeoffset_d, unsigned int *iboffset_d, unsigned int *isoffset_d, 
+            unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, 
+            unsigned int start_d, unsigned int end_d, 
+            unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, 
+            char *node_type_d){
+
+      init_real<<<1,1>>>(spnode_datas_d, bound_node_values_d, deltas_d, values_d, 
+                      oeoffset_d, iboffset_d, isoffset_d, 
+                      size_oe_d, size_ib_d, size_is_d, 
+                      start_d, end_d, 
+                      cur_oeoff_d, cur_iboff_d, cur_isoff_d, 
+                      node_type_d);
+
   }
+
   __global__
-  void init_real(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_oe_d, unsigned int start_d, unsigned int end_d, unsigned int *cur_oeoff_d, char *node_type_d){
-    tjn::values_d = values_d;
-    tjn::deltas_d = deltas_d;
-    tjn::start_d = start_d;
-    tjn::end_d = end_d;
-    tjn::oeoffset_d = oeoffset_d;
-    tjn::size_oe_d = size_oe_d;
-    tjn::cur_oeoff_d = cur_oeoff_d;
-    tjn::node_type_d = node_type_d;
-    tjn::spnode_datas_d = spnode_datas_d;
-    tjn::bound_node_values_d = bound_node_values_d;
+  void init_real(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, 
+            unsigned int *oeoffset_d, unsigned int *iboffset_d, unsigned int *isoffset_d, 
+            unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, 
+            unsigned int start_d, unsigned int end_d, 
+            unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, 
+            char *node_type_d){
+
+        tjn::values_d = values_d;
+        tjn::deltas_d = deltas_d;
+        tjn::start_d = start_d;
+        tjn::end_d = end_d;
+        tjn::oeoffset_d = oeoffset_d;
+        tjn::size_oe_d = size_oe_d;
+        tjn::cur_oeoff_d = cur_oeoff_d;
+        tjn::node_type_d = node_type_d;
+        tjn::spnode_datas_d = spnode_datas_d;
+        tjn::bound_node_values_d = bound_node_values_d;
+
   }
   void g_function_pr(unsigned int start_d, unsigned int end_d){
     dim3 block(512);
@@ -71,7 +91,7 @@ namespace tjn{
     if(index < end_d - start_d){
       // float delta = atomicExch(&deltas_d[index], 0);
       if(isChange_pr(deltas_d[index], end_d - start_d)){
-        pr_singleNode(index);
+        pr_Ingress(index);
         // atomicAdd(&values_d[index], deltas_d[index]);
         // // values_d[index] += deltas_d[index];
         // // __syncthreads();
@@ -217,6 +237,28 @@ namespace tjn{
       return false;
     }
   }
+
+  __device__
+  inline void pr_Ingress(int index){
+
+    // atomicAdd(&values_d[index], deltas_d[index]);//加在此处也可
+
+    float delta = atomicExch(&deltas_d[index], 0);
+
+    unsigned int out_degree = max(size_oe_d[index],1);
+
+    float outv = delta * 0.85f / out_degree;
+
+    for(unsigned int i=cur_oeoff_d[index];i<cur_oeoff_d[index] + size_oe_d[index];i++){
+
+      atomicAdd(&deltas_d[oeoffset_d[i]],outv);
+
+    } 
+
+    atomicAdd(&values_d[index], delta);
+
+  }
+
 
   __device__
   inline void pr_singleNode(int index){

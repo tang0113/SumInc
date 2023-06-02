@@ -465,7 +465,7 @@ class SumSyncIterWorker : public ParallelEngine {
     VertexArray<value_t, vid_t> last_values;
 
     auto& is_e_ = cpr_->is_e_;
-    auto& is_e_offset_ = cpr_->is_e_offset_;
+    auto& is_e_offset_ = cpr_->is_e_offset_;//SumInc
     auto& ib_e_ = cpr_->ib_e_;
     auto& ib_e_offset_ = cpr_->ib_e_offset_;
     auto& sync_e_ = cpr_->sync_e_;
@@ -573,49 +573,95 @@ class SumSyncIterWorker : public ParallelEngine {
     double time = 0;
 
     auto oeoffset = graph_->getOeoffset();//用于Ingress
+
     vid_t num = inner_vertices.end().GetValue() - inner_vertices.begin().GetValue();
 
-    vid_t *size_oe_d, *size_oe_h = (vid_t *)malloc(sizeof(vid_t) * num);
-    vid_t *cur_oeoff_d, *cur_oeoff_h = (vid_t *)malloc(sizeof(vid_t)  * num);
-    unsigned int offsize = 0;
-    for(int i = 0;i < num; i++){
-      cur_oeoff_h[i] = offsize;
-      offsize += oeoffset[i+1] - oeoffset[i];
+    vid_t *size_oe_d, *size_oe_h = (vid_t *)malloc(sizeof(vid_t) * num);//Ingress,用于记录每一个顶点的邻居数
+    vid_t *size_ib_d, *size_ib_h = (vid_t *)malloc(sizeof(vid_t) * num);//SumInc,node type:SingleNode
+    vid_t *size_is_d, *size_is_h = (vid_t *)malloc(sizeof(vid_t) * num);//SumInc,node type:OnlyInNode
+    
+    vid_t *cur_oeoff_d, *cur_oeoff_h = (vid_t *)malloc(sizeof(vid_t) * num);//Ingress,用于记录每一个顶点在邻居大链表中开始的偏移量
+    vid_t *cur_iboff_d, *cur_iboff_h = (vid_t *)malloc(sizeof(vid_t) * num);
+    vid_t *cur_isoff_d, *cur_isoff_h = (vid_t *)malloc(sizeof(vid_t) * num);
+    
+    unsigned int oe_offsize = 0;//临时变量
+    for(int i = 0;i < num; i++){//Ingress
+      cur_oeoff_h[i] = oe_offsize;
+      oe_offsize += oeoffset[i+1] - oeoffset[i];
       size_oe_h[i] = oeoffset[i+1] - oeoffset[i];
     }
 
-    vid_t *size_is_d;
-    for(int i = 0;i > num;i++){
-
+    unsigned int ib_offsize = 0;
+    if(compr_stage){
+      for(int i = 0;i < num;i++){//SumInc
+        cur_iboff_h[i] = ib_offsize;
+        ib_offsize += ib_e_offset_[i+1] - ib_e_offset_[i];
+        size_ib_h[i] = ib_e_offset_[i+1] - ib_e_offset_[i];
+      }
     }
+    
+
+    unsigned int is_offsize = 0;
+    if(compr_stage){
+      for(int i=0;i<num;i++){
+        cur_isoff_h[i] = is_offsize;
+        is_offsize += is_e_offset_[i+1] - is_e_offset_[i];
+        size_is_h[i] = is_e_offset_[i+1] - is_e_offset_[i];
+      }
+    }
+    
+
     value_t *deltas_d;
     value_t *values_d;
     value_t *bound_node_values_d;
     value_t *spnode_datas_d;
-    vid_t *oeoffset_d, *oeoffset_h = (vid_t *)malloc(sizeof(vid_t)  * offsize);//记录每个顶点的邻居，形成一条链表
-    char *node_type_d, *node_type_h = (char *)malloc(sizeof(char) * num);//记录每个顶点的类型
+
+    vid_t *oeoffset_d, *oeoffset_h = (vid_t *)malloc(sizeof(vid_t) * oe_offsize);//Ingress,记录每个顶点的邻居，形成一条链表
+    vid_t *iboffset_d, *iboffset_h = (vid_t *)malloc(sizeof(vid_t) * ib_offsize);//SumInc
+    vid_t *isoffset_d, *isoffset_h = (vid_t *)malloc(sizeof(vid_t) * is_offsize);//SumInc
+    char *node_type_d, *node_type_h = (char *)malloc(sizeof(char) * num);//SumInc,记录每个顶点的类型
+    
     cudaSetDevice(0);
+
     cudaMalloc(&deltas_d, sizeof(value_t) * num);
     cudaMalloc(&values_d, sizeof(value_t) * num);
-    cudaMalloc(&oeoffset_d, sizeof(vid_t) * offsize);
+    cudaMalloc(&bound_node_values_d, sizeof(value_t) * num);
+    cudaMalloc(&spnode_datas_d, sizeof(value_t) * num);
+    check();
+    cudaMalloc(&oeoffset_d, sizeof(vid_t) * oe_offsize);
+    cudaMalloc(&iboffset_d, sizeof(vid_t) * ib_offsize);
+    cudaMalloc(&isoffset_d, sizeof(vid_t) * is_offsize);
+
     cudaMalloc(&cur_oeoff_d, sizeof(vid_t) * num);
+    cudaMalloc(&cur_iboff_d, sizeof(vid_t) * num);
+    cudaMalloc(&cur_isoff_d, sizeof(vid_t) * num);
+
     cudaMalloc(&size_oe_d, sizeof(vid_t) * num);
-    bool free_need = false;
-    if(compr_stage){//启用压缩，则分配内存
-      free_need = true;
-      cudaMalloc(&node_type_d, sizeof(char) * num);//压缩， 顶点类型
-      cudaMalloc(&bound_node_values_d, sizeof(value_t) * bound_node_values.size());//给bound_node分配内存
-      cudaMalloc(&spnode_datas_d, sizeof(value_t) * spnode_datas.size());//给spnode分配内存
-    }
-    
-    // check();
-    int curIndex = 0;
+    cudaMalloc(&size_ib_d, sizeof(vid_t) * num);
+    cudaMalloc(&size_is_d, sizeof(vid_t) * num);
+
+    // bool free_need = false;
+    // if(compr_stage){//启用压缩，则分配内存
+    //   free_need = true;
+    //   cudaMalloc(&node_type_d, sizeof(char) * num);//压缩， 顶点类型
+    //   cudaMalloc(&bound_node_values_d, sizeof(value_t) * bound_node_values.size());//给bound_node分配内存
+    //   cudaMalloc(&spnode_datas_d, sizeof(value_t) * spnode_datas.size());//给spnode分配内存
+    // }
+    int oe_curIndex = 0, ib_curIndex = 0, is_curIndex = 0;
     memset(node_type_h, 0, num);
     for(int i = 0; i < num; i++){
       if(compr_stage)//启用压缩时node_type才有效
         node_type_h[i] = node_type[i];
       for(int j = 0;j < size_oe_h[i]; j++){
-          oeoffset_h[curIndex++] = oeoffset[i][j].neighbor.GetValue();
+        oeoffset_h[oe_curIndex++] = oeoffset[i][j].neighbor.GetValue();
+      }
+      for(int j = 0;j < size_ib_h[i]; j++){
+        iboffset_h[ib_curIndex++] = ib_e_offset_[i][j].neighbor.GetValue();
+        
+      }
+      for(int j = 0;j < size_is_h[i];j++){
+        isoffset_h[is_curIndex++] = is_e_offset_[i][j].neighbor.GetValue();
+        // std::cout<<"value is :"<<is_e_offset_[i][j].data;
       }
     }
 
@@ -624,16 +670,31 @@ class SumSyncIterWorker : public ParallelEngine {
     bound_node_values.fake2buffer();
     spnode_datas.fake2buffer();
     //将要用到的数据进行传输
-    cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * offsize, cudaMemcpyHostToDevice);
+    cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * oe_offsize, cudaMemcpyHostToDevice);
+    cudaMemcpy(iboffset_d, iboffset_h, sizeof(vid_t) * ib_offsize, cudaMemcpyHostToDevice);
+    cudaMemcpy(isoffset_d, isoffset_h, sizeof(vid_t) * is_offsize, cudaMemcpyHostToDevice);
+
     cudaMemcpy(cur_oeoff_d, cur_oeoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(cur_iboff_d, cur_iboff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(cur_isoff_d, cur_isoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+
     cudaMemcpy(deltas_d, deltas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
     cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
-    cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * bound_node_values.size(), cudaMemcpyHostToDevice);
-    cudaMemcpy(spnode_datas_d, spnode_datas.data_buffer, sizeof(value_t) * spnode_datas.size(), cudaMemcpyHostToDevice);
+    cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(spnode_datas_d, spnode_datas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
+
     cudaMemcpy(size_oe_d, size_oe_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(size_ib_d, size_ib_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(size_is_d, size_is_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+
     cudaMemcpy(node_type_d, node_type_h, sizeof(char) * num, cudaMemcpyHostToDevice);
     // check();
-    tjn::init(spnode_datas_d, bound_node_values_d, deltas_d, values_d, oeoffset_d, size_oe_d, inner_vertices.begin().GetValue(), inner_vertices.end().GetValue(), cur_oeoff_d, node_type_d);
+    tjn::init(spnode_datas_d, bound_node_values_d, deltas_d, values_d, 
+              oeoffset_d, iboffset_d, isoffset_d, 
+              size_oe_d, size_ib_d, size_is_d, 
+              inner_vertices.begin().GetValue(), inner_vertices.end().GetValue(), 
+              cur_oeoff_d, cur_iboff_d, cur_isoff_d, 
+              node_type_d); 
 
     while (true) {
       ++step;
@@ -734,20 +795,20 @@ class SumSyncIterWorker : public ParallelEngine {
 
             // vid_t *size_oe_d, *size_oe_h = (vid_t *)malloc(sizeof(vid_t) * num);
             // vid_t *cur_oeoff_d, *cur_oeoff_h = (vid_t *)malloc(sizeof(vid_t)  * num);
-            // unsigned int offsize = 0;
+            // unsigned int oe_offsize = 0;
             // for(int i = 0;i < num; i++){
-            //   cur_oeoff_h[i] = offsize;
-            //   offsize += oeoffset[i+1] - oeoffset[i];
+            //   cur_oeoff_h[i] = oe_offsize;
+            //   oe_offsize += oeoffset[i+1] - oeoffset[i];
             //   size_oe_h[i] = oeoffset[i+1] - oeoffset[i];
             // }
             // value_t *deltas_d;
             // value_t *values_d;
-            // vid_t *oeoffset_d, *oeoffset_h = (vid_t *)malloc(sizeof(vid_t)  * offsize);
+            // vid_t *oeoffset_d, *oeoffset_h = (vid_t *)malloc(sizeof(vid_t)  * oe_offsize);
             
             // cudaSetDevice(0);
             // cudaMalloc(&deltas_d, sizeof(value_t) * num);
             // cudaMalloc(&values_d, sizeof(value_t) * num);
-            // cudaMalloc(&oeoffset_d, sizeof(vid_t) * offsize);
+            // cudaMalloc(&oeoffset_d, sizeof(vid_t) * oe_offsize);
             // cudaMalloc(&cur_oeoff_d, sizeof(vid_t) * num);
             // cudaMalloc(&size_oe_d, sizeof(vid_t) * num);
 
@@ -764,7 +825,7 @@ class SumSyncIterWorker : public ParallelEngine {
             // deltas.fake2buffer();
             // values.fake2buffer();
 
-            // cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * offsize, cudaMemcpyHostToDevice);
+            // cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * oe_offsize, cudaMemcpyHostToDevice);
             // cudaMemcpy(cur_oeoff_d, cur_oeoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
             // cudaMemcpy(deltas_d, deltas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
             // cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
@@ -1368,21 +1429,39 @@ class SumSyncIterWorker : public ParallelEngine {
       }
     }
     free(size_oe_h);
+    free(size_ib_h);
+    free(size_is_h);
+
     free(oeoffset_h);
+    free(iboffset_h);
+    free(isoffset_h);
+
     free(cur_oeoff_h);
+    free(cur_iboff_h);
+    free(cur_isoff_h);
+
     free(node_type_h);
+
     cudaFree(deltas_d);
     cudaFree(values_d);
+    cudaFree(bound_node_values_d);
+    cudaFree(spnode_datas_d);
+
     cudaFree(oeoffset_d);
+    cudaFree(iboffset_d);
+    cudaFree(isoffset_d);
+
     cudaFree(cur_oeoff_d);
+    cudaFree(cur_iboff_d);
+    cudaFree(cur_isoff_d);
+
     cudaFree(size_oe_d);
-    if(free_need){
-      LOG(INFO) << "compress=1--Start Releasing Memory!";
-      cudaFree(node_type_d);
-      cudaFree(bound_node_values_d);
-      cudaFree(spnode_datas_d);
-      free_need = false;
-    }
+    cudaFree(size_ib_d);
+    cudaFree(size_is_d);
+
+    cudaFree(node_type_d);
+    
+
     // Analysis result
     double d_sum = 0;
     vertex_t source;

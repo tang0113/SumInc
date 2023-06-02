@@ -22,13 +22,23 @@ namespace tjn{
      * @param size_oe_d:Ingress,所有顶点的邻居size形成的链表 
      * @param node_type_d:SumInc,顶点类型
     */
-    void init(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_oe_d, unsigned int start_d, unsigned int end_d, unsigned int *cur_oeoff_d, char *node_type_d);
+    void init(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, 
+            unsigned int *oeoffset_d, unsigned int *iboffset_d, unsigned int *isoffset_d, 
+            unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, 
+            unsigned int start_d, unsigned int end_d, 
+            unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, 
+            char *node_type_d);
     
     /**
      * @brief 初始化操作
     */
     __global__
-    void init_real(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_oe_d, unsigned int start_d, unsigned int end_d, unsigned int *cur_oeoff_d, char *node_type_d);
+    void init_real(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, 
+            unsigned int *oeoffset_d, unsigned int *iboffset_d, unsigned int *isoffset_d, 
+            unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, 
+            unsigned int start_d, unsigned int end_d, 
+            unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, 
+            char *node_type_d);
 
 
     /**
@@ -61,6 +71,9 @@ namespace tjn{
     */
     __device__
     bool isChange_pr(float delta, int verticesNum);
+
+    __device__
+    void pr_Ingress(int index);
 
     /**
     * @brief 顶点类型为SingleNode时，为Ingress时也使用此函数
