@@ -168,7 +168,7 @@ namespace tjn{
             break;
           case NodeType::OnlyInNode:
             {
-              
+
             }
             break;
           case NodeType::OnlyOutNode:
