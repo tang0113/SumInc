@@ -572,29 +572,34 @@ class SumSyncIterWorker : public ParallelEngine {
 
     double time = 0;
 
-    auto oeoffset = graph_->getOeoffset();
+    auto oeoffset = graph_->getOeoffset();//用于Ingress
     vid_t num = inner_vertices.end().GetValue() - inner_vertices.begin().GetValue();
 
-    vid_t *size_d, *size_h = (vid_t *)malloc(sizeof(vid_t) * num);
-    vid_t *curOff_d, *curOff_h = (vid_t *)malloc(sizeof(vid_t)  * num);
+    vid_t *size_oe_d, *size_oe_h = (vid_t *)malloc(sizeof(vid_t) * num);
+    vid_t *cur_oeoff_d, *cur_oeoff_h = (vid_t *)malloc(sizeof(vid_t)  * num);
     unsigned int offsize = 0;
     for(int i = 0;i < num; i++){
-      curOff_h[i] = offsize;
+      cur_oeoff_h[i] = offsize;
       offsize += oeoffset[i+1] - oeoffset[i];
-      size_h[i] = oeoffset[i+1] - oeoffset[i];
+      size_oe_h[i] = oeoffset[i+1] - oeoffset[i];
+    }
+
+    vid_t *size_is_d;
+    for(int i = 0;i > num;i++){
+
     }
     value_t *deltas_d;
     value_t *values_d;
     value_t *bound_node_values_d;
     value_t *spnode_datas_d;
-    vid_t *oeoffset_d, *oeoffset_h = (vid_t *)malloc(sizeof(vid_t)  * offsize);
-    char *node_type_d, *node_type_h = (char *)malloc(sizeof(char) * num);
+    vid_t *oeoffset_d, *oeoffset_h = (vid_t *)malloc(sizeof(vid_t)  * offsize);//记录每个顶点的邻居，形成一条链表
+    char *node_type_d, *node_type_h = (char *)malloc(sizeof(char) * num);//记录每个顶点的类型
     cudaSetDevice(0);
     cudaMalloc(&deltas_d, sizeof(value_t) * num);
     cudaMalloc(&values_d, sizeof(value_t) * num);
     cudaMalloc(&oeoffset_d, sizeof(vid_t) * offsize);
-    cudaMalloc(&curOff_d, sizeof(vid_t) * num);
-    cudaMalloc(&size_d, sizeof(vid_t) * num);
+    cudaMalloc(&cur_oeoff_d, sizeof(vid_t) * num);
+    cudaMalloc(&size_oe_d, sizeof(vid_t) * num);
     bool free_need = false;
     if(compr_stage){//启用压缩，则分配内存
       free_need = true;
@@ -609,10 +614,9 @@ class SumSyncIterWorker : public ParallelEngine {
     for(int i = 0; i < num; i++){
       if(compr_stage)//启用压缩时node_type才有效
         node_type_h[i] = node_type[i];
-      for(int j = 0;j < size_h[i]; j++){
+      for(int j = 0;j < size_oe_h[i]; j++){
           oeoffset_h[curIndex++] = oeoffset[i][j].neighbor.GetValue();
       }
-
     }
 
     deltas.fake2buffer();
@@ -621,15 +625,15 @@ class SumSyncIterWorker : public ParallelEngine {
     spnode_datas.fake2buffer();
     //将要用到的数据进行传输
     cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * offsize, cudaMemcpyHostToDevice);
-    cudaMemcpy(curOff_d, curOff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(cur_oeoff_d, cur_oeoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
     cudaMemcpy(deltas_d, deltas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
     cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
     cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * bound_node_values.size(), cudaMemcpyHostToDevice);
     cudaMemcpy(spnode_datas_d, spnode_datas.data_buffer, sizeof(value_t) * spnode_datas.size(), cudaMemcpyHostToDevice);
-    cudaMemcpy(size_d, size_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(size_oe_d, size_oe_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
     cudaMemcpy(node_type_d, node_type_h, sizeof(char) * num, cudaMemcpyHostToDevice);
     // check();
-    tjn::init(deltas_d, values_d, oeoffset_d, size_d, inner_vertices.begin().GetValue(), inner_vertices.end().GetValue(), curOff_d, node_type_d);
+    tjn::init(spnode_datas_d, bound_node_values_d, deltas_d, values_d, oeoffset_d, size_oe_d, inner_vertices.begin().GetValue(), inner_vertices.end().GetValue(), cur_oeoff_d, node_type_d);
 
     while (true) {
       ++step;
@@ -728,13 +732,13 @@ class SumSyncIterWorker : public ParallelEngine {
             // auto oeoffset = graph_->getOeoffset();
             // vid_t num = inner_vertices.end().GetValue() - inner_vertices.begin().GetValue();
 
-            // vid_t *size_d, *size_h = (vid_t *)malloc(sizeof(vid_t) * num);
-            // vid_t *curOff_d, *curOff_h = (vid_t *)malloc(sizeof(vid_t)  * num);
+            // vid_t *size_oe_d, *size_oe_h = (vid_t *)malloc(sizeof(vid_t) * num);
+            // vid_t *cur_oeoff_d, *cur_oeoff_h = (vid_t *)malloc(sizeof(vid_t)  * num);
             // unsigned int offsize = 0;
             // for(int i = 0;i < num; i++){
-            //   curOff_h[i] = offsize;
+            //   cur_oeoff_h[i] = offsize;
             //   offsize += oeoffset[i+1] - oeoffset[i];
-            //   size_h[i] = oeoffset[i+1] - oeoffset[i];
+            //   size_oe_h[i] = oeoffset[i+1] - oeoffset[i];
             // }
             // value_t *deltas_d;
             // value_t *values_d;
@@ -744,14 +748,14 @@ class SumSyncIterWorker : public ParallelEngine {
             // cudaMalloc(&deltas_d, sizeof(value_t) * num);
             // cudaMalloc(&values_d, sizeof(value_t) * num);
             // cudaMalloc(&oeoffset_d, sizeof(vid_t) * offsize);
-            // cudaMalloc(&curOff_d, sizeof(vid_t) * num);
-            // cudaMalloc(&size_d, sizeof(vid_t) * num);
+            // cudaMalloc(&cur_oeoff_d, sizeof(vid_t) * num);
+            // cudaMalloc(&size_oe_d, sizeof(vid_t) * num);
 
             // // check();
 
             // int curIndex = 0;
             // for(int i = 0; i < num; i++){
-            //   for(int j = 0;j < size_h[i]; j++){
+            //   for(int j = 0;j < size_oe_h[i]; j++){
             //       oeoffset_h[curIndex++] = oeoffset[i][j].neighbor.GetValue();
             //   }
 
@@ -761,14 +765,14 @@ class SumSyncIterWorker : public ParallelEngine {
             // values.fake2buffer();
 
             // cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * offsize, cudaMemcpyHostToDevice);
-            // cudaMemcpy(curOff_d, curOff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+            // cudaMemcpy(cur_oeoff_d, cur_oeoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
             // cudaMemcpy(deltas_d, deltas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
             // cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
-            // cudaMemcpy(size_d, size_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+            // cudaMemcpy(size_oe_d, size_oe_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
             // // check();
             // double time2 = GetCurrentTime();
             // time += time2 - time1;
-            // tjn::g_function_pr(deltas_d, values_d, oeoffset_d, size_d, inner_vertices.begin().GetValue(), inner_vertices.end().GetValue(), curOff_d);
+            // tjn::g_function_pr(deltas_d, values_d, oeoffset_d, size_oe_d, inner_vertices.begin().GetValue(), inner_vertices.end().GetValue(), cur_oeoff_d);
             // cudaDeviceSynchronize();
             // check();
             // double time3 = GetCurrentTime();
@@ -780,12 +784,12 @@ class SumSyncIterWorker : public ParallelEngine {
             // cudaFree(deltas_d);
             // cudaFree(values_d);
             // cudaFree(oeoffset_d);
-            // cudaFree(size_d);
-            // cudaFree(curOff_d);
+            // cudaFree(size_oe_d);
+            // cudaFree(cur_oeoff_d);
 
-            // free(size_h);
+            // free(size_oe_h);
             // free(oeoffset_h);
-            // free(curOff_h);
+            // free(cur_oeoff_h);
             // double time4 = GetCurrentTime();
             // time += time4 - time3;
             // printf("transtime is %f\n",time);
@@ -1363,15 +1367,15 @@ class SumSyncIterWorker : public ParallelEngine {
         }
       }
     }
-    free(size_h);
+    free(size_oe_h);
     free(oeoffset_h);
-    free(curOff_h);
+    free(cur_oeoff_h);
     free(node_type_h);
     cudaFree(deltas_d);
     cudaFree(values_d);
     cudaFree(oeoffset_d);
-    cudaFree(curOff_d);
-    cudaFree(size_d);
+    cudaFree(cur_oeoff_d);
+    cudaFree(size_oe_d);
     if(free_need){
       LOG(INFO) << "compress=1--Start Releasing Memory!";
       cudaFree(node_type_d);

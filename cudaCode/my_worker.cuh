@@ -1,6 +1,5 @@
 #ifndef MY_WORKER_CUH
 #define MY_WORKER_CUH
-
 namespace tjn{
     /**
      * @author tjn
@@ -15,14 +14,21 @@ namespace tjn{
     __global__
     void value2last_real(float *last_values_d,float *values_d,unsigned int *v_d,int size);
 
-    
-    void init(float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_d, unsigned int start_d, unsigned int end_d, unsigned int *curOff_d, char *node_type_d);
+    /**
+     * @param spnode_datas_d:SumInc,所有超点的值
+     * @param bound_node_values_d:SumInc,所有边界点的值
+     * @param oeoffset_d:Ingress,所有顶点的邻接表合并成的一个链表
+     * @param cur_oeoff_d:Ingress,所有顶点在oeoffset中的起始偏移量形成的链表
+     * @param size_oe_d:Ingress,所有顶点的邻居size形成的链表 
+     * @param node_type_d:SumInc,顶点类型
+    */
+    void init(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_oe_d, unsigned int start_d, unsigned int end_d, unsigned int *cur_oeoff_d, char *node_type_d);
     
     /**
      * @brief 初始化操作
     */
     __global__
-    void init_real(float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_d, unsigned int start_d, unsigned int end_d, unsigned int *curOff_d, char *node_type_d);
+    void init_real(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_oe_d, unsigned int start_d, unsigned int end_d, unsigned int *cur_oeoff_d, char *node_type_d);
 
 
     /**
@@ -56,7 +62,32 @@ namespace tjn{
     __device__
     bool isChange_pr(float delta, int verticesNum);
 
+    /**
+    * @brief 顶点类型为SingleNode时，为Ingress时也使用此函数
+    * @param index:表示当前线程的索引，也可理解为当前顶点的索引
+    */
     __device__
     void pr_singleNode(int index);
+
+    /**
+     * @brief 顶点类型为OnlyInNode
+    */
+    __device__
+    void pr_onlyInNode(int index);
+
+    /**
+     * @brief 顶点类型为OnlyInNode
+     */
+    __device__
+    void pr_onlyOutNode(int index);
+
+    __device__
+    void pr_bothOutInNode(int index);
+
+    __device__
+    void pr_outMaster(int index);
+
+    __device__
+    void pr_bothOutInMaster(int index);
 }
 #endif

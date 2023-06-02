@@ -1,16 +1,17 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 #include "my_worker.cuh"
-#include "grape/utils/vertex_array.h"
 namespace tjn{
   __device__ float *values_d;
   __device__ float *deltas_d;
   __device__ unsigned int start_d;
   __device__ unsigned int end_d;
   __device__ unsigned int *oeoffset_d;
-  __device__ unsigned int *curOff_d;
-  __device__ unsigned int *size_d;
+  __device__ unsigned int *cur_oeoff_d;
+  __device__ unsigned int *size_oe_d;
   __device__ char *node_type_d;
+  __device__ float *spnode_datas_d;
+  __device__ float *bound_node_values_d;
   /**
    * @brief node type
   */
@@ -42,19 +43,21 @@ namespace tjn{
     //     // printf("numis %d\n", size);
     // }
   }
-  void init(float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_d, unsigned int start_d, unsigned int end_d, unsigned int *curOff_d, char *node_type_d){
-    init_real<<<1,1>>>(deltas_d, values_d, oeoffset_d, size_d, start_d, end_d, curOff_d, node_type_d);
+  void init(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_oe_d, unsigned int start_d, unsigned int end_d, unsigned int *cur_oeoff_d, char *node_type_d){
+    init_real<<<1,1>>>(spnode_datas_d, bound_node_values_d, deltas_d, values_d, oeoffset_d, size_oe_d, start_d, end_d, cur_oeoff_d, node_type_d);
   }
   __global__
-  void init_real(float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_d, unsigned int start_d, unsigned int end_d, unsigned int *curOff_d, char *node_type_d){
+  void init_real(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, unsigned int *oeoffset_d, unsigned int *size_oe_d, unsigned int start_d, unsigned int end_d, unsigned int *cur_oeoff_d, char *node_type_d){
     tjn::values_d = values_d;
     tjn::deltas_d = deltas_d;
     tjn::start_d = start_d;
     tjn::end_d = end_d;
     tjn::oeoffset_d = oeoffset_d;
-    tjn::size_d = size_d;
-    tjn::curOff_d = curOff_d;
+    tjn::size_oe_d = size_oe_d;
+    tjn::cur_oeoff_d = cur_oeoff_d;
     tjn::node_type_d = node_type_d;
+    tjn::spnode_datas_d = spnode_datas_d;
+    tjn::bound_node_values_d = bound_node_values_d;
   }
   void g_function_pr(unsigned int start_d, unsigned int end_d){
     dim3 block(512);
@@ -80,12 +83,12 @@ namespace tjn{
         // // atomicAdd(&values_d[index], delta);
         // // values_d[index] += delta;
         // // values_d[index] += delta;
-        // unsigned int out_degree = max(size_d[index],1);
+        // unsigned int out_degree = max(size_oe_d[index],1);
         // // atomicExch(&deltas_d[index], 0);
         // // __syncthreads();
         // // __threadfence();
         // float outv = delta * 0.85f / out_degree;
-        // for(unsigned int i=curOff_d[index];i<curOff_d[index] + size_d[index];i++){
+        // for(unsigned int i=cur_oeoff_d[index];i<cur_oeoff_d[index] + size_oe_d[index];i++){
         //   // deltas_d[ oeoffset_d[i] ] += outv;
         //   atomicAdd(&deltas_d[oeoffset_d[i]],outv);
         // } 
@@ -106,7 +109,7 @@ namespace tjn{
     // if(index < offsize){
     //   if(isChange_pr(deltas_d[start_d + curId_d[index]], end_d - start_d)){
     //     double delta = deltas_d[start_d + curId_d[index]];
-    //     unsigned int out_degree = size_d[start_d + curId_d[index]];
+    //     unsigned int out_degree = size_oe_d[start_d + curId_d[index]];
     //     double outv = delta * 0.85f / out_degree;
     //     // __syncthreads();
     //     // atomicAdd(&deltas_d[oeoffset_d[index]], outv);
@@ -131,14 +134,14 @@ namespace tjn{
     //   }
     // }
     // // if(oeoffset_d[row * blockDim.x + col] == end_d - start_d){
-    //   if(size_d[start_d + row] == 0)deltas_d[row] = 0;
+    //   if(size_oe_d[start_d + row] == 0)deltas_d[row] = 0;
     //   return ;
     // }
     // if(isChange_pr(deltas_d[start_d + row], end_d - start_d)){
 
     //   float delta = deltas_d[start_d + row];
 
-    //   unsigned int out_degree = size_d[start_d + row];
+    //   unsigned int out_degree = size_oe_d[start_d + row];
     //   float outv = delta * 0.85f / out_degree;
     //   __syncthreads();
     //   atomicAdd(&deltas_d[oeoffset_d[row * blockDim.x + col]], outv);
@@ -215,25 +218,56 @@ namespace tjn{
     }
   }
 
-  /**
-   * @brief 顶点类型为SingleNode时，为Ingress时也使用此函数
-  */
   __device__
   inline void pr_singleNode(int index){
 
-    atomicAdd(&values_d[index], deltas_d[index]);
+    // atomicAdd(&values_d[index], deltas_d[index]);//加在此处也可
 
     float delta = atomicExch(&deltas_d[index], 0);
 
-    unsigned int out_degree = max(size_d[index],1);
+    unsigned int out_degree = max(size_oe_d[index],1);
 
     float outv = delta * 0.85f / out_degree;
 
-    for(unsigned int i=curOff_d[index];i<curOff_d[index] + size_d[index];i++){
+    for(unsigned int i=cur_oeoff_d[index];i<cur_oeoff_d[index] + size_oe_d[index];i++){
 
       atomicAdd(&deltas_d[oeoffset_d[i]],outv);
 
     } 
+
+    atomicAdd(&values_d[index], delta);
+
+  }
+
+  __device__
+  inline void pr_onlyInNode(int index){
+
+    float delta = atomicExch(&deltas_d[index], 0);
+    
+    unsigned int out_degree = max(size_oe_d[index],1);
+
+    float outv = delta * 0.85f / out_degree;
+
+
+  }
+
+  __device__
+  inline void pr_onlyOutNode(int index){
+
+  }
+
+  __device__
+  inline void pr_bothOutInNode(int index){
+
+  }
+
+  __device__
+  inline void pr_outMaster(int index){
+
+  }
+
+  __device__
+  inline void pr_bothOutInMaster(int index){
 
   }
 }
