@@ -27,7 +27,7 @@ namespace tjn{
             unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, 
             unsigned int start_d, unsigned int end_d, 
             unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, 
-            char *node_type_d);
+            char *node_type_d, float *is_edata_d);
     
     /**
      * @brief 初始化操作
@@ -38,7 +38,7 @@ namespace tjn{
             unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, 
             unsigned int start_d, unsigned int end_d, 
             unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, 
-            char *node_type_d);
+            char *node_type_d, float *is_edata_d);
 
 
     /**

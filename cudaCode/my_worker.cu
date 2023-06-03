@@ -4,14 +4,26 @@
 namespace tjn{
   __device__ float *values_d;
   __device__ float *deltas_d;
-  __device__ unsigned int start_d;
-  __device__ unsigned int end_d;
-  __device__ unsigned int *oeoffset_d;
-  __device__ unsigned int *cur_oeoff_d;
-  __device__ unsigned int *size_oe_d;
-  __device__ char *node_type_d;
   __device__ float *spnode_datas_d;
   __device__ float *bound_node_values_d;
+
+  __device__ unsigned int start_d;
+  __device__ unsigned int end_d;
+
+  __device__ unsigned int *oeoffset_d;
+  __device__ unsigned int *iboffset_d;
+  __device__ unsigned int *isoffset_d;
+
+  __device__ unsigned int *cur_oeoff_d;
+  __device__ unsigned int *cur_iboff_d;
+  __device__ unsigned int *cur_isoff_d;
+
+  __device__ unsigned int *size_oe_d;
+  __device__ unsigned int *size_ib_d;
+  __device__ unsigned int *size_is_d;
+  __device__ char *node_type_d;
+  __device__ float *is_edata_d;
+  
   /**
    * @brief node type
   */
@@ -48,14 +60,14 @@ namespace tjn{
             unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, 
             unsigned int start_d, unsigned int end_d, 
             unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, 
-            char *node_type_d){
+            char *node_type_d, float *is_edata_d){
 
       init_real<<<1,1>>>(spnode_datas_d, bound_node_values_d, deltas_d, values_d, 
                       oeoffset_d, iboffset_d, isoffset_d, 
                       size_oe_d, size_ib_d, size_is_d, 
                       start_d, end_d, 
                       cur_oeoff_d, cur_iboff_d, cur_isoff_d, 
-                      node_type_d);
+                      node_type_d, is_edata_d);
 
   }
 
@@ -65,18 +77,31 @@ namespace tjn{
             unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, 
             unsigned int start_d, unsigned int end_d, 
             unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, 
-            char *node_type_d){
+            char *node_type_d, float *is_edata_d){
 
         tjn::values_d = values_d;
         tjn::deltas_d = deltas_d;
-        tjn::start_d = start_d;
-        tjn::end_d = end_d;
-        tjn::oeoffset_d = oeoffset_d;
-        tjn::size_oe_d = size_oe_d;
-        tjn::cur_oeoff_d = cur_oeoff_d;
-        tjn::node_type_d = node_type_d;
         tjn::spnode_datas_d = spnode_datas_d;
         tjn::bound_node_values_d = bound_node_values_d;
+
+        tjn::start_d = start_d;
+        tjn::end_d = end_d;
+
+        tjn::oeoffset_d = oeoffset_d;
+        tjn::iboffset_d = iboffset_d;
+        tjn::isoffset_d = isoffset_d;
+
+        tjn::size_oe_d = size_oe_d;
+        tjn::size_ib_d = size_ib_d;
+        tjn::size_is_d = size_is_d;
+
+        tjn::cur_oeoff_d = cur_oeoff_d;
+        tjn::cur_iboff_d = cur_iboff_d;
+        tjn::cur_isoff_d = cur_isoff_d;
+
+        tjn::node_type_d = node_type_d;
+        tjn::is_edata_d = is_edata_d;
+        
 
   }
   void g_function_pr(unsigned int start_d, unsigned int end_d){
@@ -182,47 +207,55 @@ namespace tjn{
   void g_function_compr_real(){
     int index = threadIdx.x + blockIdx.x * blockDim.x;
     if(index < end_d - start_d){
-      if(isChange_pr(deltas_d[index], end_d - start_d)){
-        switch(node_type_d[index]){
-          case NodeType::SingleNode:
-            {
+      switch(node_type_d[index]){
+        case NodeType::SingleNode:
+          {
+            if(isChange_pr(deltas_d[index], end_d - start_d)){
               pr_singleNode(index);
+            }else{
+              return ;
             }
-            break;
-          case NodeType::OnlyInNode:
-            {
+          }
+          break;
+        case NodeType::OnlyInNode:
+          {
+            if(isChange_pr(deltas_d[index], end_d - start_d)){
+              pr_onlyInNode(index);
+            }else{
+              return ;
+            }
+          }
+          break;
+        case NodeType::OnlyOutNode:
+          {
+            if(isChange_pr(bound_node_values_d[index], end_d - start_d)){
+              pr_onlyOutNode(index);
+            }else{
+              return ;
+            }
+          }
+          break;
+        case NodeType::BothOutInNode:
+          {
 
-            }
-            break;
-          case NodeType::OnlyOutNode:
-            {
+          }
+          {
 
-            }
-            break;
-          case NodeType::BothOutInNode:
-            {
+          }
+          break;
+        case NodeType::OutMaster:
+          {
 
-            }
-            {
+          }
+          break;
+        case NodeType::BothOutInMaster:
+          {
 
-            }
-            break;
-          case NodeType::OutMaster:
-            {
+          }
+          {
 
-            }
-            break;
-          case NodeType::BothOutInMaster:
-            {
-
-            }
-            {
-
-            }
-            break;
-        }
-      }else{
-        return ;
+          }
+          break;
       }
     }else{
       return ;
@@ -267,13 +300,13 @@ namespace tjn{
 
     float delta = atomicExch(&deltas_d[index], 0);
 
-    unsigned int out_degree = max(size_oe_d[index],1);
+    unsigned int out_degree = max(size_ib_d[index],1);
 
     float outv = delta * 0.85f / out_degree;
 
-    for(unsigned int i=cur_oeoff_d[index];i<cur_oeoff_d[index] + size_oe_d[index];i++){
+    for(unsigned int i=cur_iboff_d[index];i<cur_iboff_d[index] + size_ib_d[index];i++){
 
-      atomicAdd(&deltas_d[oeoffset_d[i]],outv);
+      atomicAdd(&deltas_d[iboffset_d[i]],outv);
 
     } 
 
@@ -286,21 +319,43 @@ namespace tjn{
 
     float delta = atomicExch(&deltas_d[index], 0);
     
-    unsigned int out_degree = max(size_oe_d[index],1);
+    // unsigned int out_degree = max(size_is_d[index],1);
 
-    float outv = delta * 0.85f / out_degree;
+    // float outv = delta * 0.85f / out_degree;
 
+    for(unsigned int i=cur_isoff_d[index];i<cur_isoff_d[index] + size_is_d[index];i++){
+
+      atomicAdd(&bound_node_values_d[isoffset_d[i]],delta * is_edata_d[i]);
+
+    }
+
+    atomicAdd(&spnode_datas_d[index], delta);
 
   }
 
   __device__
   inline void pr_onlyOutNode(int index){
 
+    float delta = atomicExch(&bound_node_values_d[index], 0);
+
+    unsigned int old_out_degree = size_oe_d[index];
+
+    unsigned int out_degree = size_ib_d[index];
+
+    if(out_degree > 0){
+      float outv = delta * 0.85f / old_out_degree;
+      for(unsigned int i=cur_iboff_d[index];i<cur_iboff_d[index] + size_ib_d[index];i++){
+        atomicAdd(&deltas_d[iboffset_d[i]],outv);
+      }
+    }
+
+    atomicAdd(&values_d[index], delta);
+
   }
 
   __device__
   inline void pr_bothOutInNode(int index){
-
+    
   }
 
   __device__
