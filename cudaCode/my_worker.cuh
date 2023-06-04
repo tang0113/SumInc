@@ -23,10 +23,10 @@ namespace tjn{
      * @param node_type_d:SumInc,顶点类型
     */
     void init(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, 
-            unsigned int *oeoffset_d, unsigned int *iboffset_d, unsigned int *isoffset_d, 
-            unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, 
+            unsigned int *oeoffset_d, unsigned int *iboffset_d, unsigned int *isoffset_d, unsigned int *syncoffset_d, 
+            unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, unsigned int *size_sync_d, 
             unsigned int start_d, unsigned int end_d, 
-            unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, 
+            unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, unsigned int *cur_syncoff_d, 
             char *node_type_d, float *is_edata_d);
     
     /**
@@ -34,10 +34,10 @@ namespace tjn{
     */
     __global__
     void init_real(float *spnode_datas_d, float *bound_node_values_d, float *deltas_d, float *values_d, 
-            unsigned int *oeoffset_d, unsigned int *iboffset_d, unsigned int *isoffset_d, 
-            unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, 
+            unsigned int *oeoffset_d, unsigned int *iboffset_d, unsigned int *isoffset_d, unsigned int *syncoffset_d, 
+            unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, unsigned int *size_sync_d, 
             unsigned int start_d, unsigned int end_d, 
-            unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, 
+            unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, unsigned int *cur_syncoff_d, 
             char *node_type_d, float *is_edata_d);
 
 
