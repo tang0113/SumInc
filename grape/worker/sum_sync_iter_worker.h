@@ -722,7 +722,7 @@ class SumSyncIterWorker : public ParallelEngine {
               cur_oeoff_d, cur_iboff_d, cur_isoff_d, cur_syncoff_d,
               node_type_d, is_edata_d); 
               check();
-    bool gpu_start = true;;
+    bool gpu_start = FLAGS_gpu_start;
     while (true) {
       ++step;
 

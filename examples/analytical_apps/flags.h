@@ -60,5 +60,6 @@ DECLARE_string(serialization_cmp_prefix);
 DECLARE_int32(compress_type);
 DECLARE_string(message_type);
 DECLARE_double(compress_threshold);
+DECLARE_bool(gpu_start);
 
 #endif  // EXAMPLES_ANALYTICAL_APPS_FLAGS_H_
