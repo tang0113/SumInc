@@ -40,7 +40,6 @@ namespace tjn{
             unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, unsigned int *cur_syncoff_d, 
             char *node_type_d, float *is_edata_d);
 
-
     /**
      * @author tjn
      * @brief computation part of pagerank

@@ -111,6 +111,7 @@ namespace tjn{
         
 
   }
+
   void g_function_pr(unsigned int start_d, unsigned int end_d){
     dim3 block(512);
     dim3 grid((end_d - start_d - 1) / block.x + 1);
@@ -224,17 +225,17 @@ namespace tjn{
           break;
         case NodeType::BothOutInNode:
           {
-            pr_bothOutInNode(index);
+            // pr_bothOutInNode(index);
           }
           break;
         case NodeType::OutMaster:
           {
-            pr_outMaster(index);
+            // pr_outMaster(index);
           }
           break;
         case NodeType::BothOutInMaster:
           {
-            pr_bothOutInMaster(index);
+            // pr_bothOutInMaster(index);
           }
           break;
       }
@@ -282,6 +283,7 @@ namespace tjn{
 
   __device__
   inline void pr_singleNode(int index){//g_function(*graph_, u, value, delta, oes)
+    // printf("singleNOde");
 
     if(isChange_pr(deltas_d[index], end_d - start_d)){
       // atomicAdd(&values_d[index], deltas_d[index]);//加在此处也可
@@ -304,7 +306,8 @@ namespace tjn{
 
   __device__
   inline void pr_onlyInNode(int index){//g_index_function(*graph_, u, value, delta, adj, bound_node_values)     
-
+    // printf("onlyInNode");
+    
     if(isChange_pr(deltas_d[index], end_d - start_d)){
       float delta = atomicExch(&deltas_d[index], 0);
       // unsigned int out_degree = max(size_is_d[index],1);
@@ -319,8 +322,9 @@ namespace tjn{
 
   __device__
   inline void pr_onlyOutNode(int index){//g_function(*graph_, u, value, delta, oes, adj)
-
+    // printf("OnlyOutNode");
     if(isChange_pr(bound_node_values_d[index], end_d - start_d)){
+      atomicAdd(&values_d[index], bound_node_values_d[index]);
       float delta = atomicExch(&bound_node_values_d[index], 0);
 
       unsigned int old_out_degree = size_oe_d[index];
@@ -333,7 +337,7 @@ namespace tjn{
         }
       }
 
-      atomicAdd(&values_d[index], delta);
+      
 
     }
 
@@ -347,6 +351,7 @@ namespace tjn{
 
   __device__
   inline void pr_outMaster(int index){
+    // printf("outMaster");
     if(isChange_pr(bound_node_values_d[index], end_d - start_d)){
 
       float delta = atomicExch(&bound_node_values_d[index], 0);
@@ -379,6 +384,8 @@ namespace tjn{
 
   __device__
   inline void pr_bothOutInMaster(int index){
+
+    // printf("bothOutInMaster");
     pr_onlyInNode(index);
     pr_outMaster(index);
   }
