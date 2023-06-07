@@ -206,43 +206,43 @@ namespace tjn{
   __global__
   void g_function_compr_real(){
     int index = threadIdx.x + blockIdx.x * blockDim.x;
-    if(index < end_d - start_d){
-      switch(node_type_d[index]){
-        case NodeType::SingleNode:
-          {
-            pr_singleNode(index);
-          }
-          break;
-        case NodeType::OnlyInNode:
-          {
-            pr_onlyInNode(index);
-          }
-          break;
-        case NodeType::OnlyOutNode:
-          {
-            pr_onlyOutNode(index);
-          }
-          break;
-        case NodeType::BothOutInNode:
-          {
-            // pr_bothOutInNode(index);
-          }
-          break;
-        case NodeType::OutMaster:
-          {
-            // pr_outMaster(index);
-          }
-          break;
-        case NodeType::BothOutInMaster:
-          {
-            // pr_bothOutInMaster(index);
-          }
-          break;
+      if(index < end_d - start_d){
+        switch(node_type_d[index]){
+          case NodeType::SingleNode:
+            {
+              pr_singleNode(index);
+            }
+            break;
+          case NodeType::OnlyInNode:
+            {
+              pr_onlyInNode(index);
+            }
+            break;
+          case NodeType::OnlyOutNode:
+            {
+              pr_onlyOutNode(index);
+            }
+            break;
+          case NodeType::BothOutInNode:
+            {
+              pr_bothOutInNode(index);
+            }
+            break;
+          case NodeType::OutMaster:
+            {
+              pr_outMaster(index);
+            }
+            break;
+          case NodeType::BothOutInMaster:
+            {
+              pr_bothOutInMaster(index);
+            }
+            break;
+        }
+        // __syncthreads();
+      }else{
+        return ;
       }
-      // __syncthreads();
-    }else{
-      return ;
-    }
   }
 
   __device__

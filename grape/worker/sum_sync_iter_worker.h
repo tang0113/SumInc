@@ -576,14 +576,14 @@ class SumSyncIterWorker : public ParallelEngine {
     vid_t num = inner_vertices.end().GetValue() - inner_vertices.begin().GetValue();
 
     vid_t *size_oe_d, *size_oe_h = (vid_t *)malloc(sizeof(vid_t) * num);//Ingress,用于记录每一个顶点的邻居数
-    vid_t *size_ib_d, *size_ib_h = (vid_t *)malloc(sizeof(vid_t) * num);//SumInc,node type:SingleNode
-    vid_t *size_is_d, *size_is_h = (vid_t *)malloc(sizeof(vid_t) * num);//SumInc,node type:OnlyInNode
-    vid_t *size_sync_d, *size_sync_h = (vid_t *)malloc(sizeof(vid_t) * num);//SumInc,node type:OutMaster
+    vid_t *size_ib_d, *size_ib_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);//SumInc,node type:SingleNode
+    vid_t *size_is_d, *size_is_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);//SumInc,node type:OnlyInNode
+    vid_t *size_sync_d, *size_sync_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);//SumInc,node type:OutMaster
     
     vid_t *cur_oeoff_d, *cur_oeoff_h = (vid_t *)malloc(sizeof(vid_t) * num);//Ingress,用于记录每一个顶点在邻居大链表中开始的偏移量
-    vid_t *cur_iboff_d, *cur_iboff_h = (vid_t *)malloc(sizeof(vid_t) * num);
-    vid_t *cur_isoff_d, *cur_isoff_h = (vid_t *)malloc(sizeof(vid_t) * num);
-    vid_t *cur_syncoff_d, *cur_syncoff_h = (vid_t *)malloc(sizeof(vid_t) * num);
+    vid_t *cur_iboff_d, *cur_iboff_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);
+    vid_t *cur_isoff_d, *cur_isoff_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);
+    vid_t *cur_syncoff_d, *cur_syncoff_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);
     
     unsigned int oe_offsize = 0;//临时变量
     for(int i = 0;i < num; i++){//Ingress
@@ -594,7 +594,7 @@ class SumSyncIterWorker : public ParallelEngine {
 
     unsigned int ib_offsize = 0;
     if(compr_stage){
-      for(int i = 0;i < num;i++){//SumInc
+      for(int i = 0;i < cpr_->all_node_num;i++){//SumInc
         cur_iboff_h[i] = ib_offsize;
         ib_offsize += ib_e_offset_[i+1] - ib_e_offset_[i];
         size_ib_h[i] = ib_e_offset_[i+1] - ib_e_offset_[i];
@@ -603,7 +603,7 @@ class SumSyncIterWorker : public ParallelEngine {
     
     unsigned int is_offsize = 0;
     if(compr_stage){
-      for(int i=0;i<num;i++){
+      for(int i=0;i < cpr_->all_node_num;i++){
         cur_isoff_h[i] = is_offsize;
         is_offsize += is_e_offset_[i+1] - is_e_offset_[i];
         size_is_h[i] = is_e_offset_[i+1] - is_e_offset_[i];
@@ -612,7 +612,7 @@ class SumSyncIterWorker : public ParallelEngine {
 
     unsigned int sync_offsize = 0;
     if(compr_stage){
-      for(int i=0;i<num;i++){
+      for(int i=0;i<cpr_->all_node_num;i++){
         cur_syncoff_h[i] = sync_offsize;
         sync_offsize += sync_e_offset_[i+1] - sync_e_offset_[i];
         size_sync_h[i] = sync_e_offset_[i+1] - sync_e_offset_[i];
@@ -630,15 +630,15 @@ class SumSyncIterWorker : public ParallelEngine {
     vid_t *isoffset_d, *isoffset_h = (vid_t *)malloc(sizeof(vid_t) * is_offsize);//SumInc
     vid_t *syncoffset_d, *syncoffset_h = (vid_t *)malloc(sizeof(vid_t) * sync_offsize);//SumInc
     value_t *is_edata_d, *is_edata_h = (value_t *)malloc(sizeof(value_t) * is_offsize);//边数据
-    char *node_type_d, *node_type_h = (char *)malloc(sizeof(char) * num);//SumInc,记录每个顶点的类型
+    char *node_type_d, *node_type_h = (char *)malloc(sizeof(char) * cpr_->all_node_num);//SumInc,记录每个顶点的类型
 
     
     cudaSetDevice(0);
 
     cudaMalloc(&deltas_d, sizeof(value_t) * num);
     cudaMalloc(&values_d, sizeof(value_t) * num);
-    cudaMalloc(&bound_node_values_d, sizeof(value_t) * num);
-    cudaMalloc(&spnode_datas_d, sizeof(value_t) * num);
+    cudaMalloc(&bound_node_values_d, sizeof(value_t) * cpr_->all_node_num);
+    cudaMalloc(&spnode_datas_d, sizeof(value_t) * cpr_->all_node_num);
     // check();
     cudaMalloc(&oeoffset_d, sizeof(vid_t) * oe_offsize);
     cudaMalloc(&iboffset_d, sizeof(vid_t) * ib_offsize);
@@ -647,17 +647,17 @@ class SumSyncIterWorker : public ParallelEngine {
     cudaMalloc(&is_edata_d, sizeof(value_t) * is_offsize);
     // check();
     cudaMalloc(&cur_oeoff_d, sizeof(vid_t) * num);
-    cudaMalloc(&cur_iboff_d, sizeof(vid_t) * num);
-    cudaMalloc(&cur_isoff_d, sizeof(vid_t) * num);
-    cudaMalloc(&cur_syncoff_d, sizeof(vid_t) * num);
+    cudaMalloc(&cur_iboff_d, sizeof(vid_t) * cpr_->all_node_num);
+    cudaMalloc(&cur_isoff_d, sizeof(vid_t) * cpr_->all_node_num);
+    cudaMalloc(&cur_syncoff_d, sizeof(vid_t) * cpr_->all_node_num);
     // check();
 
     cudaMalloc(&size_oe_d, sizeof(vid_t) * num);
-    cudaMalloc(&size_ib_d, sizeof(vid_t) * num);
-    cudaMalloc(&size_is_d, sizeof(vid_t) * num);
-    cudaMalloc(&size_sync_d, sizeof(vid_t) * num);
+    cudaMalloc(&size_ib_d, sizeof(vid_t) * cpr_->all_node_num);
+    cudaMalloc(&size_is_d, sizeof(vid_t) * cpr_->all_node_num);
+    cudaMalloc(&size_sync_d, sizeof(vid_t) * cpr_->all_node_num);
     // check();
-    cudaMalloc(&node_type_d, sizeof(char) * num);
+    cudaMalloc(&node_type_d, sizeof(char) * cpr_->all_node_num);
     // bool free_need = false;
     // if(compr_stage){//启用压缩，则分配内存
     //   free_need = true;
@@ -666,12 +666,15 @@ class SumSyncIterWorker : public ParallelEngine {
     //   cudaMalloc(&spnode_datas_d, sizeof(value_t) * spnode_datas.size());//给spnode分配内存
     // }
     int oe_curIndex = 0, ib_curIndex = 0, is_curIndex = 0, sync_curIndex = 0;
-    for(int i = 0; i < num; i++){
+    for(int i = 0,k=0; i < cpr_->all_node_num; i++,k++){
       if(compr_stage)//启用压缩时node_type才有效
         node_type_h[i] = node_type[i];
-      for(int j = 0;j < size_oe_h[i]; j++){
-        oeoffset_h[oe_curIndex++] = oeoffset[i][j].neighbor.GetValue();
+      if(k < num){
+        for(int j = 0;j < size_oe_h[k]; j++){
+          oeoffset_h[oe_curIndex++] = oeoffset[k][j].neighbor.GetValue();
+        }
       }
+      
       for(int j = 0;j < size_ib_h[i]; j++){
         iboffset_h[ib_curIndex++] = ib_e_offset_[i][j].neighbor.GetValue();
         
@@ -698,21 +701,21 @@ class SumSyncIterWorker : public ParallelEngine {
     cudaMemcpy(is_edata_d, is_edata_h, sizeof(value_t) * is_offsize, cudaMemcpyHostToDevice);
     // check();
     cudaMemcpy(cur_oeoff_d, cur_oeoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
-    cudaMemcpy(cur_iboff_d, cur_iboff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
-    cudaMemcpy(cur_isoff_d, cur_isoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
-    cudaMemcpy(cur_syncoff_d, cur_syncoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(cur_iboff_d, cur_iboff_h, sizeof(vid_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
+    cudaMemcpy(cur_isoff_d, cur_isoff_h, sizeof(vid_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
+    cudaMemcpy(cur_syncoff_d, cur_syncoff_h, sizeof(vid_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
     // check();
     cudaMemcpy(deltas_d, deltas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
     cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
-    cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
-    cudaMemcpy(spnode_datas_d, spnode_datas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
+    cudaMemcpy(spnode_datas_d, spnode_datas.data_buffer, sizeof(value_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
     // check();
     cudaMemcpy(size_oe_d, size_oe_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
-    cudaMemcpy(size_ib_d, size_ib_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
-    cudaMemcpy(size_is_d, size_is_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
-    cudaMemcpy(size_sync_d, size_sync_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(size_ib_d, size_ib_h, sizeof(vid_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
+    cudaMemcpy(size_is_d, size_is_h, sizeof(vid_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
+    cudaMemcpy(size_sync_d, size_sync_h, sizeof(vid_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
     // check();
-    cudaMemcpy(node_type_d, node_type_h, sizeof(char) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(node_type_d, node_type_h, sizeof(char) * cpr_->all_node_num, cudaMemcpyHostToDevice);
     // check();
     tjn::init(spnode_datas_d, bound_node_values_d, deltas_d, values_d, 
               oeoffset_d, iboffset_d, isoffset_d, syncoffset_d, 
@@ -815,7 +818,6 @@ class SumSyncIterWorker : public ParallelEngine {
                 }
                 // }
               }
-              check_result();
             }
             
             // double time1 = GetCurrentTime();
@@ -892,8 +894,8 @@ class SumSyncIterWorker : public ParallelEngine {
               bound_node_values.fake2buffer();
               cudaMemcpy(deltas_d, deltas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
               cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
-              cudaMemcpy(spnode_datas_d, spnode_datas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
-              cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
+              cudaMemcpy(spnode_datas_d, spnode_datas.data_buffer, sizeof(value_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
+              cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
               tjn::g_function_pr(inner_vertices.begin().GetValue(), inner_vertices.end().GetValue());
               cudaDeviceSynchronize();
               check();
@@ -901,8 +903,8 @@ class SumSyncIterWorker : public ParallelEngine {
               cudaMemcpy(deltas.data_buffer, deltas_d, sizeof(value_t) * num, cudaMemcpyDeviceToHost);
               
               cudaMemcpy(values.data_buffer, values_d, sizeof(value_t) * num, cudaMemcpyDeviceToHost);
-              cudaMemcpy(bound_node_values.data_buffer, bound_node_values_d, sizeof(value_t) * num, cudaMemcpyDeviceToHost);
-              cudaMemcpy(spnode_datas.data_buffer, spnode_datas_d, sizeof(value_t) * num, cudaMemcpyDeviceToHost);
+              cudaMemcpy(bound_node_values.data_buffer, bound_node_values_d, sizeof(value_t) * cpr_->all_node_num, cudaMemcpyDeviceToHost);
+              cudaMemcpy(spnode_datas.data_buffer, spnode_datas_d, sizeof(value_t) * cpr_->all_node_num, cudaMemcpyDeviceToHost);
               
               deltas.buffer2fake();
               values.buffer2fake();
@@ -911,7 +913,6 @@ class SumSyncIterWorker : public ParallelEngine {
               double time2 = GetCurrentTime();
               time += time2 - time1;
               printf("time is :%f",time);
-              check_result();
             }
             
 
@@ -931,15 +932,14 @@ class SumSyncIterWorker : public ParallelEngine {
             // }
             if(1){
               if(gpu_start){
-                check_result();
                 values.fake2buffer();
                 deltas.fake2buffer();
                 spnode_datas.fake2buffer();
                 bound_node_values.fake2buffer();
                 cudaMemcpy(deltas_d, deltas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
                 cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
-                cudaMemcpy(spnode_datas_d, spnode_datas.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
-                cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
+                cudaMemcpy(spnode_datas_d, spnode_datas.data_buffer, sizeof(value_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
+                cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
               //   tjn::init(spnode_datas_d, bound_node_values_d, deltas_d, values_d, 
               // oeoffset_d, iboffset_d, isoffset_d, syncoffset_d, 
               // size_oe_d, size_ib_d, size_is_d, size_sync_d, 
@@ -951,8 +951,8 @@ class SumSyncIterWorker : public ParallelEngine {
                 check();
                 cudaMemcpy(deltas.data_buffer, deltas_d, sizeof(value_t) * num, cudaMemcpyDeviceToHost);
                 cudaMemcpy(values.data_buffer, values_d, sizeof(value_t) * num, cudaMemcpyDeviceToHost);
-                cudaMemcpy(spnode_datas.data_buffer, spnode_datas_d, sizeof(value_t) * num, cudaMemcpyDeviceToHost);
-                cudaMemcpy(bound_node_values.data_buffer, bound_node_values_d, sizeof(value_t) * num, cudaMemcpyDeviceToHost);
+                cudaMemcpy(spnode_datas.data_buffer, spnode_datas_d, sizeof(value_t) * cpr_->all_node_num, cudaMemcpyDeviceToHost);
+                cudaMemcpy(bound_node_values.data_buffer, bound_node_values_d, sizeof(value_t) * cpr_->all_node_num, cudaMemcpyDeviceToHost);
                 check();
                 
                 deltas.buffer2fake();
@@ -960,11 +960,9 @@ class SumSyncIterWorker : public ParallelEngine {
                 
                 spnode_datas.buffer2fake();
                 bound_node_values.buffer2fake();
-                check_result();
               }
               
               if(!gpu_start){
-                check_result();
                 parallel_for(vid_t i = inner_vertices.begin().GetValue(); i < inner_vertices.end().GetValue(); i++) {
 
                   vertex_t u(i);
@@ -1016,124 +1014,122 @@ class SumSyncIterWorker : public ParallelEngine {
                     break;
                   case NodeType::BothOutInNode:
                     /* 2. source node: source send message to inner_bound_node by inner_bound_index */
-                    // {
-                    //   value_t& old_delta = deltas[u];
-                    //   if (isChange(old_delta)) {
-                    //     auto delta = atomic_exch(old_delta, app_->default_v());
-                    //     auto& value = values[u];
-                    //     adj_list_index_t adj = adj_list_index_t(is_e_offset_[i], 
-                    //                                               is_e_offset_[i+1]);
-                    //     app_->g_index_function(*graph_, u, value, delta, adj, 
-                    //                                               bound_node_values);
-                    //     app_->accumulate_atomic(spnode_datas[u], delta);
-                    //   }
-                    // }
-                    // /* 3. bound node: some node in is_spnode_in and supernode_out_bound at the same time. */
-                    // {
-                    //   value_t& old_delta = bound_node_values[u];
-                    //   if (isChange(old_delta)) {
-                    //     auto delta = atomic_exch(old_delta, app_->default_v());
-                    //     auto& value = values[u];
-                    //     auto oes = graph_->GetOutgoingAdjList(u);
-                    //     adj_list_t adj = adj_list_t(ib_e_offset_[i], 
-                    //                                 ib_e_offset_[i+1]);
-                    //     app_->g_function(*graph_, u, value, delta, oes, adj);  // out degree neq now adjlist.size
-                    //     app_->accumulate_atomic(value, delta);
-                    //   }
-                    // }
+                    {
+                      value_t& old_delta = deltas[u];
+                      if (isChange(old_delta)) {
+                        auto delta = atomic_exch(old_delta, app_->default_v());
+                        auto& value = values[u];
+                        adj_list_index_t adj = adj_list_index_t(is_e_offset_[i], 
+                                                                  is_e_offset_[i+1]);
+                        app_->g_index_function(*graph_, u, value, delta, adj, 
+                                                                  bound_node_values);
+                        app_->accumulate_atomic(spnode_datas[u], delta);
+                      }
+                    }
+                    /* 3. bound node: some node in is_spnode_in and supernode_out_bound at the same time. */
+                    {
+                      value_t& old_delta = bound_node_values[u];
+                      if (isChange(old_delta)) {
+                        auto delta = atomic_exch(old_delta, app_->default_v());
+                        auto& value = values[u];
+                        auto oes = graph_->GetOutgoingAdjList(u);
+                        adj_list_t adj = adj_list_t(ib_e_offset_[i], 
+                                                    ib_e_offset_[i+1]);
+                        app_->g_function(*graph_, u, value, delta, oes, adj);  // out degree neq now adjlist.size
+                        app_->accumulate_atomic(value, delta);
+                      }
+                    }
                     break;
                   case NodeType::OutMaster:
-                    // {
-                    //   /* 3. bound node: some node in is_spnode_in and supernode_out_bound at the same time. */
-                    //   value_t& old_delta = bound_node_values[u];
-                    //   if (isChange(old_delta)) {
-                    //     auto delta = atomic_exch(old_delta, app_->default_v());
-                    //     auto& value = values[u];
-                    //     auto oes = graph_->GetOutgoingAdjList(u);
-                    //     adj_list_t adj = adj_list_t(ib_e_offset_[i], 
-                    //                                 ib_e_offset_[i+1]);
-                    //     app_->g_function(*graph_, u, value, delta, oes, adj);  // out degree neq now adjlist.size
-                    //     app_->accumulate_atomic(value, delta);
-                    //     /* in-master */
-                    //     if (delta != app_->default_v()) {
-                    //       adj_list_t sync_adj = adj_list_t(sync_e_offset_[i], 
-                    //                                       sync_e_offset_[i+1]);
-                    //       for (auto e : sync_adj) {
-                    //         vertex_t v = e.neighbor;
-                    //         // sync to mirror v
-                    //         app_->accumulate_atomic(deltas[v], delta);
-                    //         // active mirror v
-                    //         value_t& old_delta = deltas[v];
-                    //         auto delta = atomic_exch(old_delta, app_->default_v());
-                    //         auto& value = values[v];
-                    //         adj_list_index_t adj = adj_list_index_t(
-                    //                                 is_e_offset_[v.GetValue()], 
-                    //                                 is_e_offset_[v.GetValue()+1]);
-                    //         app_->g_index_function(*graph_, v, value, delta, adj, 
-                    //                                 bound_node_values);
-                    //         app_->accumulate_atomic(spnode_datas[v], delta);
-                    //       }
-                    //     }
-                    //   }
-                    // }
+                    {
+                      /* 3. bound node: some node in is_spnode_in and supernode_out_bound at the same time. */
+                      value_t& old_delta = bound_node_values[u];
+                      if (isChange(old_delta)) {
+                        auto delta = atomic_exch(old_delta, app_->default_v());
+                        auto& value = values[u];
+                        auto oes = graph_->GetOutgoingAdjList(u);
+                        adj_list_t adj = adj_list_t(ib_e_offset_[i], 
+                                                    ib_e_offset_[i+1]);
+                        app_->g_function(*graph_, u, value, delta, oes, adj);  // out degree neq now adjlist.size
+                        app_->accumulate_atomic(value, delta);
+                        /* in-master */
+                        if (delta != app_->default_v()) {
+                          adj_list_t sync_adj = adj_list_t(sync_e_offset_[i], 
+                                                          sync_e_offset_[i+1]);
+                          for (auto e : sync_adj) {
+                            vertex_t v = e.neighbor;
+                            // sync to mirror v
+                            app_->accumulate_atomic(deltas[v], delta);
+                            // active mirror v
+                            value_t& old_delta = deltas[v];
+                            auto delta = atomic_exch(old_delta, app_->default_v());
+                            auto& value = values[v];
+                            adj_list_index_t adj = adj_list_index_t(
+                                                    is_e_offset_[v.GetValue()], 
+                                                    is_e_offset_[v.GetValue()+1]);
+                            app_->g_index_function(*graph_, v, value, delta, adj, 
+                                                    bound_node_values);
+                            app_->accumulate_atomic(spnode_datas[v], delta);
+                          }
+                        }
+                      }
+                    }
                     break;
                   case NodeType::BothOutInMaster:
                     /* 2. source node: source send message to inner_bound_node by inner_bound_index */
-                    // {
-                    //   value_t& old_delta = deltas[u];
-                    //   if (isChange(old_delta)) {
-                    //     auto delta = atomic_exch(old_delta, app_->default_v());
-                    //     auto& value = values[u];
-                    //     adj_list_index_t adj = adj_list_index_t(is_e_offset_[i], 
-                    //                                             is_e_offset_[i+1]);
-                    //     app_->g_index_function(*graph_, u, value, delta, adj, 
-                    //                                               bound_node_values);
-                    //     app_->accumulate_atomic(spnode_datas[u], delta);
-                    //   }
-                    // }
-                    // {
-                    //   /* 3. bound node: some node in is_spnode_in and supernode_out_bound at the same time. */
-                    //   value_t& old_delta = bound_node_values[u];
-                    //   if (isChange(old_delta)) {
-                    //     auto delta = atomic_exch(old_delta, app_->default_v());
-                    //     auto& value = values[u];
-                    //     auto oes = graph_->GetOutgoingAdjList(u);
-                    //     adj_list_t adj = adj_list_t(ib_e_offset_[i], 
-                    //                                 ib_e_offset_[i+1]);
-                    //     app_->g_function(*graph_, u, value, delta, oes, adj);  // out degree neq now adjlist.size
-                    //     app_->accumulate_atomic(value, delta);
-                    //     /* in-master */
-                    //     if (delta != app_->default_v()) {
-                    //       adj_list_t sync_adj = adj_list_t(sync_e_offset_[i], 
-                    //                                       sync_e_offset_[i+1]);
-                    //       for (auto e : sync_adj) {
-                    //         vertex_t v = e.neighbor;
-                    //         // sync to mirror v
-                    //         app_->accumulate_atomic(deltas[v], delta);
-                    //         // active mirror v
-                    //         value_t& old_delta = deltas[v];
-                    //         auto delta = atomic_exch(old_delta, app_->default_v());
-                    //         auto& value = values[v];
-                    //         adj_list_index_t adj = adj_list_index_t(
-                    //                                 is_e_offset_[v.GetValue()], 
-                    //                                 is_e_offset_[v.GetValue()+1]);
-                    //         app_->g_index_function(*graph_, v, value, delta, adj, 
-                    //                                 bound_node_values);
-                    //         app_->accumulate_atomic(spnode_datas[v], delta);
-                    //       }
-                    //     }
-                    //   }
-                    // }
+                    {
+                      value_t& old_delta = deltas[u];
+                      if (isChange(old_delta)) {
+                        auto delta = atomic_exch(old_delta, app_->default_v());
+                        auto& value = values[u];
+                        adj_list_index_t adj = adj_list_index_t(is_e_offset_[i], 
+                                                                is_e_offset_[i+1]);
+                        app_->g_index_function(*graph_, u, value, delta, adj, 
+                                                                  bound_node_values);
+                        app_->accumulate_atomic(spnode_datas[u], delta);
+                      }
+                    }
+                    {
+                      /* 3. bound node: some node in is_spnode_in and supernode_out_bound at the same time. */
+                      value_t& old_delta = bound_node_values[u];
+                      if (isChange(old_delta)) {
+                        auto delta = atomic_exch(old_delta, app_->default_v());
+                        auto& value = values[u];
+                        auto oes = graph_->GetOutgoingAdjList(u);
+                        adj_list_t adj = adj_list_t(ib_e_offset_[i], 
+                                                    ib_e_offset_[i+1]);
+                        app_->g_function(*graph_, u, value, delta, oes, adj);  // out degree neq now adjlist.size
+                        app_->accumulate_atomic(value, delta);
+                        /* in-master */
+                        if (delta != app_->default_v()) {
+                          adj_list_t sync_adj = adj_list_t(sync_e_offset_[i], 
+                                                          sync_e_offset_[i+1]);
+                          for (auto e : sync_adj) {
+                            vertex_t v = e.neighbor;
+                            // sync to mirror v
+                            app_->accumulate_atomic(deltas[v], delta);
+                            // active mirror v
+                            value_t& old_delta = deltas[v];
+                            auto delta = atomic_exch(old_delta, app_->default_v());
+                            auto& value = values[v];
+                            adj_list_index_t adj = adj_list_index_t(
+                                                    is_e_offset_[v.GetValue()], 
+                                                    is_e_offset_[v.GetValue()+1]);
+                            app_->g_index_function(*graph_, v, value, delta, adj, 
+                                                    bound_node_values);
+                            app_->accumulate_atomic(spnode_datas[v], delta);
+                          }
+                        }
+                      }
+                    }
                     break;
                   }
                 }
-                check_result();
               }
               
-            
             /* out-mirror sync to master */
             vid_t size = cpr_->all_out_mirror.size();
-            parallel_for (vid_t i = 0; i < size; i++) {
+            parallel_for (vid_t i = 0; i < size; i++) {//parallel
               vertex_t u =cpr_->all_out_mirror[i];
               value_t& old_delta = bound_node_values[u];
               if (isChange(old_delta)) {
@@ -1335,7 +1331,7 @@ class SumSyncIterWorker : public ParallelEngine {
         ForEach(outer_vertices, [this, &deltas, &channels](int tid,
                                                            vertex_t v) {
           auto& delta_to_send = deltas[v];
-          printf("v is %d",v.GetValue());
+          printf("yes");
           if (delta_to_send != app_->default_v()) {
             channels[tid].template SyncStateOnOuterVertex<fragment_t, value_t>(
                 *graph_, v, delta_to_send);
@@ -1396,7 +1392,6 @@ class SumSyncIterWorker : public ParallelEngine {
           /* 注意: 加了mirror之后,与原来的不同,入口点累积的消息需要同时发送给入口点所在的
               超点和其入口mirror所在的超点.
            */
-          std::cout<<"allnodenum is"<<cpr_->all_node_num;
           parallel_for(vid_t i = 0; i < cpr_->all_node_num; i++) {
 
             // printf("i is %d\n",i);
