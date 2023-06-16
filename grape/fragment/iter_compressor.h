@@ -31,7 +31,7 @@ class IterCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
     double supernode_termcheck_threshold_2 = FLAGS_termcheck_threshold/1000; // to pre compute
     const bool iter_compressor_flags_cilk = false;
     // int thread_num = FLAGS_build_index_concurrency;
-    int thread_num = 52; // 为了测试增量部分
+    int thread_num = 1; // 为了测试增量部分
 
     IterCompressor(std::shared_ptr<APP_T>& app,
                         std::shared_ptr<fragment_t>& graph):CompressorBase<APP_T, SUPERNODE_T>(app, graph){}

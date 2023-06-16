@@ -3308,6 +3308,7 @@ class CompressorBase : public ParallelEngine{
         
         // for (vid_t cid = 0; cid < spn_ids_num; cid++){
         //     vid_t j = init_cluster[cid].first;
+	unsigned long int number = 0;
         for (vid_t j = 0; j < spn_ids_num; j++) {
             std::vector<vertex_t> &node_set = clusters[j];
             // 统计所有入口点/出口点的源顶点
@@ -3317,6 +3318,10 @@ class CompressorBase : public ParallelEngine{
             std::set<vertex_t> old_exit_node;
             count_t temp_old_inner_edge = 0;
             for (auto u : node_set) {
+		
+		if(number % 100000 == 0)
+              LOG(INFO) << "u is "<< number;
+		number++;
               for (auto e : this->graph_->GetIncomingAdjList(u)) {
                 vid_t to_ids = id2clusterid[e.neighbor];
                 if (to_ids != j) { // 外部点
@@ -3786,7 +3791,7 @@ class CompressorBase : public ParallelEngine{
         vid_t inner_node_num = this->all_node_num;
         subgraph.resize(inner_node_num);
         // std::vector<size_t> ia_oe_degree(inner_node_num+1, 0);
-        vid_t ia_oe_num = 0; 
+        vid_t ia_oe_num = 0;  
         parallel_for(vid_t i = 0; i < spn_ids_num; i++){
             std::vector<vertex_t> &node_set = this->supernode_ids[i];
             std::vector<vertex_t> &in_mirror_ids 
@@ -3814,10 +3819,10 @@ class CompressorBase : public ParallelEngine{
                 for(auto& oe : oes){
                     // 入口优先，不需要过滤掉存在出口Mirror的点
                     if(this->id2spids[oe.neighbor] == ids_id
-                         ){ // in-mirror edge
+                        ){ // in-mirror edge
                         // && v_out_mirror.find(oe.neighbor) == v_out_mirror.end()){ // in-mirror edge
                         subgraph[m_id.GetValue()].emplace_back(nbr_t(oe.neighbor,
-                                                                     oe.data));
+                                                                    oe.data));
                     }
                 }
             }
