@@ -27,7 +27,8 @@ namespace tjn{
             unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, unsigned int *size_sync_d, 
             unsigned int start_d, unsigned int end_d, 
             unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, unsigned int *cur_syncoff_d, 
-            char *node_type_d, float *is_edata_d);
+            char *node_type_d, float *is_edata_d, 
+            unsigned int *all_out_mirror_d, unsigned int *mirrorid2vid_d);
     
     /**
      * @brief 初始化操作
@@ -38,7 +39,8 @@ namespace tjn{
             unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, unsigned int *size_sync_d, 
             unsigned int start_d, unsigned int end_d, 
             unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, unsigned int *cur_syncoff_d, 
-            char *node_type_d, float *is_edata_d);
+            char *node_type_d, float *is_edata_d, 
+            unsigned int *all_out_mirror_d, unsigned int *mirrorid2vid_d);
 
     /**
      * @author tjn
@@ -63,6 +65,14 @@ namespace tjn{
     */
     __global__
     void g_function_compr_real();
+
+    /**
+     * @brief 直接在gpu上发
+    */
+    void OutMirrorSyncToMaster(unsigned int size);
+
+    __global__
+    void OutMirrorSyncToMaster_real(unsigned int size);
 
     /**
      * @author tjn

@@ -3792,6 +3792,8 @@ class CompressorBase : public ParallelEngine{
         subgraph.resize(inner_node_num);
         // std::vector<size_t> ia_oe_degree(inner_node_num+1, 0);
         vid_t ia_oe_num = 0;  
+        LOG(INFO) << "sub.size = "<<subgraph.size();
+        LOG(INFO) << "sp id num is "<<spn_ids_num;
         parallel_for(vid_t i = 0; i < spn_ids_num; i++){
             std::vector<vertex_t> &node_set = this->supernode_ids[i];
             std::vector<vertex_t> &in_mirror_ids 

@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 #include "my_worker.cuh"
+#include "glog/src/glog/logging.h"
 namespace tjn{
   __device__ float *values_d;
   __device__ float *deltas_d;
@@ -26,6 +27,9 @@ namespace tjn{
   __device__ unsigned int *size_sync_d;
   __device__ char *node_type_d;
   __device__ float *is_edata_d;
+
+  __device__ unsigned int *all_out_mirror_d;
+  __device__ unsigned int *mirrorid2vid_d;
   
   /**
    * @brief node type
@@ -64,14 +68,16 @@ namespace tjn{
             unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, unsigned int *size_sync_d, 
             unsigned int start_d, unsigned int end_d, 
             unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, unsigned int *cur_syncoff_d, 
-            char *node_type_d, float *is_edata_d){
+            char *node_type_d, float *is_edata_d, 
+            unsigned int *all_out_mirror_d, unsigned int *mirrorid2vid_d){
 
       init_real<<<1,1>>>(spnode_datas_d, bound_node_values_d, deltas_d, values_d, 
                       oeoffset_d, iboffset_d, isoffset_d, syncoffset_d, 
                       size_oe_d, size_ib_d, size_is_d, size_sync_d, 
                       start_d, end_d, 
                       cur_oeoff_d, cur_iboff_d, cur_isoff_d, cur_syncoff_d, 
-                      node_type_d, is_edata_d);
+                      node_type_d, is_edata_d, 
+                      all_out_mirror_d, mirrorid2vid_d);
 
   }
 
@@ -81,7 +87,8 @@ namespace tjn{
             unsigned int *size_oe_d, unsigned int *size_ib_d, unsigned int *size_is_d, unsigned int *size_sync_d, 
             unsigned int start_d, unsigned int end_d, 
             unsigned int *cur_oeoff_d, unsigned int *cur_iboff_d, unsigned int *cur_isoff_d, unsigned int *cur_syncoff_d, 
-            char *node_type_d, float *is_edata_d){
+            char *node_type_d, float *is_edata_d, 
+            unsigned int *all_out_mirror_d, unsigned int *mirrorid2vid_d){
 
         tjn::values_d = values_d;
         tjn::deltas_d = deltas_d;
@@ -109,6 +116,8 @@ namespace tjn{
         tjn::node_type_d = node_type_d;
         tjn::is_edata_d = is_edata_d;
         
+        tjn::all_out_mirror_d = all_out_mirror_d;
+        tjn::mirrorid2vid_d = mirrorid2vid_d;
 
   }
 
@@ -211,6 +220,7 @@ namespace tjn{
           case NodeType::SingleNode:
             {
               pr_singleNode(index);
+              
             }
             break;
           case NodeType::OnlyInNode:
@@ -243,6 +253,23 @@ namespace tjn{
       }else{
         return ;
       }
+  }
+
+  void OutMirrorSyncToMaster(unsigned int size){
+    dim3 block(512);
+    dim3 grid((size - 1) / block.x + 1);
+    OutMirrorSyncToMaster_real<<<grid, block>>>(size);
+  }
+
+  __global__
+  void OutMirrorSyncToMaster_real(unsigned int size){
+    int index = threadIdx.x + blockIdx.x * blockDim.x;
+    if(index < size && isChange_pr(bound_node_values_d[all_out_mirror_d[index]], end_d - start_d)){
+      float delta = atomicExch(&bound_node_values_d[all_out_mirror_d[index]], 0);
+      atomicAdd(&deltas_d[mirrorid2vid_d[index]], delta);
+    }else{
+      return ;
+    }
   }
 
   __device__
