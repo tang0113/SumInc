@@ -1465,60 +1465,98 @@ class SumSyncIterWorker : public ParallelEngine {
           /* 注意: 加了mirror之后,与原来的不同,入口点累积的消息需要同时发送给入口点所在的
               超点和其入口mirror所在的超点.
            */
-          parallel_for(vid_t i = 0; i < cpr_->all_node_num; i++) {
+          if(gpu_start){
+            vid_t *c_node_num_d, *c_node_num_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);
+            vid_t *spnode_id_d, *spnode_id_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);
 
-            // printf("i is %d\n",i);
-            vertex_t u(i);
-            auto& delta = spnode_datas[u];
-            if(delta != app_->default_v()){
-              vid_t cid = cpr_->id2spids[u];
-              vid_t c_node_num = cpr_->supernode_ids[cid].size();
-              
-              if(isChange(delta, c_node_num)){
-                vid_t sp_id = cpr_->Fc_map[u];
-                
-                supernode_t &spnode = cpr_->supernodes[sp_id];
-                
-                auto& value = values[spnode.id];
+            
 
-                auto& oes_d = spnode.inner_delta;
-                auto& oes_v = spnode.inner_value;
-                app_->g_index_func_delta(*graph_, spnode.id, value, delta, oes_d); //If the threshold is small enough when calculating the index, it can be omitted here
-                app_->g_index_func_value(*graph_, spnode.id, value, delta, oes_v);
-                delta = app_->default_v();
+            vid_t *cur_off_delta_d, *cur_off_delta_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);
+            vid_t *cur_off_value_d, *cur_off_value_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);
+
+            vid_t *size_delta_d, *size_delta_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);
+            vid_t *size_value_d, *size_value_h = (vid_t *)malloc(sizeof(vid_t) * cpr_->all_node_num);
+
+            int delta_offsize = 0, value_offsize = 0;
+            for(vid_t i = 0;i<cpr_->all_node_num;i++){
+              vertex_t u(i);
+              c_node_num_h[i] = cpr_->supernode_ids[cpr_->id2spids[u]].size(); 
+              spnode_id_h[i] = cpr_->supernodes[cpr_->Fc_map[u]].id.GetValue();
+
+              cur_off_delta_h[i] = delta_offsize;
+              cur_off_value_h[i] = value_offsize;
+
+              size_delta_h[i] = cpr_->supernodes[cpr_->Fc_map[u]].inner_delta.size();
+              size_value_h[i] = cpr_->supernodes[cpr_->Fc_map[u]].inner_value.size();
+
+              delta_offsize += size_delta_h[i];
+              value_offsize += size_value_h[i];
+            }
+
+            vid_t *oes_delta_first_d, *oes_delta_first_h = (vid_t *)malloc(sizeof(vid_t) * delta_offsize);
+            value_t *oes_delta_second_d, *oes_delta_second_h = (value_t *)malloc(sizeof(value_t) * value_offsize);
+
+            cudaMalloc(&c_node_num_d, sizeof(vid_t) * cpr_->all_node_num);
+            cudaMemcpy(c_node_num_d, c_node_num_h, sizeof(vid_t) * cpr_->all_node_num, cudaMemcpyHostToDevice);
+            // tjn::correct_deviation();
+          }
+
+          if(!gpu_start){
+            parallel_for(vid_t i = 0; i < cpr_->all_node_num; i++) {
+
+              // printf("i is %d\n",i);
+              vertex_t u(i);
+              auto& delta = spnode_datas[u];
+              if(delta != app_->default_v()){
+                vid_t cid = cpr_->id2spids[u];
+                vid_t c_node_num = cpr_->supernode_ids[cid].size();
+                
+                if(isChange(delta, c_node_num)){
+                  vid_t sp_id = cpr_->Fc_map[u];
+                  
+                  supernode_t &spnode = cpr_->supernodes[sp_id];
+                  
+                  auto& value = values[spnode.id];
+
+                  auto& oes_d = spnode.inner_delta;
+                  auto& oes_v = spnode.inner_value;
+                  app_->g_index_func_delta(*graph_, spnode.id, value, delta, oes_d); //If the threshold is small enough when calculating the index, it can be omitted here
+                  app_->g_index_func_value(*graph_, spnode.id, value, delta, oes_v);
+                  delta = app_->default_v();
+                }
+
+              // const char type = node_type[i];
+              // if(type == NodeType::OnlyInNode || type == NodeType::BothOutInNode){
+              //   auto& delta = spnode_datas[u];
+              //   auto& master_delta = master_datas[u];
+              //   vid_t ids_id = cpr_->id2spids[u];         
+              //   // LOG(INFO) << "spnode_datas[" << graph_->GetId(u) << "]=" << delta;
+              //   for(auto mp : cpr_->shortcuts[i]) {
+              //     vid_t sp_id = mp.second;
+              //     supernode_t &spnode = cpr_->supernodes[sp_id];
+              //     auto& oes_d = spnode.inner_delta;
+              //     auto& oes_v = spnode.inner_value;
+              //     auto& value = values[spnode.id];
+              //     if (mp.first == ids_id) {
+              //       if(delta != app_->default_v()){
+              //         app_->g_index_func_delta(*graph_, spnode.id, value, delta, oes_d); //If the threshold is small enough when calculating the index, it can be omitted here
+              //         app_->g_index_func_value(*graph_, spnode.id, value, delta, oes_v);
+              //       }
+              //     }
+              //     if (mp.first != ids_id) { // im-mirror
+              //       if(master_delta != app_->default_v()){
+              //         // LOG(INFO) << "master_delta[" << graph_->GetId(u) << "]=" 
+              //                   // << master_delta;
+              //         app_->g_index_func_delta(*graph_, spnode.id, value, 
+              //                                   master_delta, oes_d); //If the threshold is small enough when calculating the index, it can be omitted here
+              //         app_->g_index_func_value(*graph_, spnode.id, value,
+              //                                   master_delta, oes_v);
+              //       }
+              //     }
+              //   }
+              //   master_delta = app_->default_v();
+                // delta = app_->default_v();
               }
-
-            // const char type = node_type[i];
-            // if(type == NodeType::OnlyInNode || type == NodeType::BothOutInNode){
-            //   auto& delta = spnode_datas[u];
-            //   auto& master_delta = master_datas[u];
-            //   vid_t ids_id = cpr_->id2spids[u];         
-            //   // LOG(INFO) << "spnode_datas[" << graph_->GetId(u) << "]=" << delta;
-            //   for(auto mp : cpr_->shortcuts[i]) {
-            //     vid_t sp_id = mp.second;
-            //     supernode_t &spnode = cpr_->supernodes[sp_id];
-            //     auto& oes_d = spnode.inner_delta;
-            //     auto& oes_v = spnode.inner_value;
-            //     auto& value = values[spnode.id];
-            //     if (mp.first == ids_id) {
-            //       if(delta != app_->default_v()){
-            //         app_->g_index_func_delta(*graph_, spnode.id, value, delta, oes_d); //If the threshold is small enough when calculating the index, it can be omitted here
-            //         app_->g_index_func_value(*graph_, spnode.id, value, delta, oes_v);
-            //       }
-            //     }
-            //     if (mp.first != ids_id) { // im-mirror
-            //       if(master_delta != app_->default_v()){
-            //         // LOG(INFO) << "master_delta[" << graph_->GetId(u) << "]=" 
-            //                   // << master_delta;
-            //         app_->g_index_func_delta(*graph_, spnode.id, value, 
-            //                                   master_delta, oes_d); //If the threshold is small enough when calculating the index, it can be omitted here
-            //         app_->g_index_func_value(*graph_, spnode.id, value,
-            //                                   master_delta, oes_v);
-            //       }
-            //     }
-            //   }
-            //   master_delta = app_->default_v();
-              // delta = app_->default_v();
             }
           }
           
