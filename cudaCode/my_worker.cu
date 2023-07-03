@@ -1,7 +1,7 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 #include "my_worker.cuh"
-#include "glog/src/glog/logging.h"
+// #include "glog/src/glog/logging.h"
 namespace tjn{
   __device__ float *values_d;
   __device__ float *deltas_d;

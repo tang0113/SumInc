@@ -25,6 +25,7 @@
 #include "grape/parallel/parallel_message_manager.h"
 #include "timer.h"
 #include "grape/fragment/trav_compressor.h"
+#include "my_ssspworker.cuh"
 
 namespace grape {
 
@@ -740,6 +741,65 @@ class SumSyncTraversalWorker : public ParallelEngine {
       LOG(INFO) << "---------------------end------------------------";
     }
 
+    auto oeoffset = fragment_->getOeoffset();
+    vid_t num = fragment_->InnerVertices().size();
+
+    //Ingress,使用gpu,分配内存,传输数据,初始化
+
+    vid_t *size_oe_d, *size_oe_h = (vid_t *)malloc(sizeof(vid_t) * num);//Ingress,用于记录每一个顶点的邻居数
+    vid_t *cur_oeoff_d, *cur_oeoff_h = (vid_t *)malloc(sizeof(vid_t) * num);//Ingress,用于记录每一个顶点在邻居大链表中开始的偏移量
+
+    unsigned int oe_offsize = 0;//临时变量
+    for(int i = 0;i < num; i++){//Ingress
+      cur_oeoff_h[i] = oe_offsize;
+      oe_offsize += oeoffset[i+1] - oeoffset[i];
+      size_oe_h[i] = oeoffset[i+1] - oeoffset[i];
+    }
+
+    auto &values = app_->values_;
+    auto &deltas = app_->deltas_;
+    value_t *deltas_d, *deltas_h = (value_t *)malloc(sizeof(value_t) * num);
+    value_t *values_d;
+
+    vid_t *oeoffset_d, *oeoffset_h = (vid_t *)malloc(sizeof(vid_t) * oe_offsize);//Ingress,记录每个顶点的邻居，形成一条链表
+    value_t *oe_edata_d, *oe_edata_h = (value_t *)malloc(sizeof(value_t) * oe_offsize);
+
+    cudaSetDevice(0);
+
+    cudaMalloc(&deltas_d, sizeof(value_t) * num);
+    cudaMalloc(&values_d, sizeof(value_t) * num);
+    cudaMalloc(&oeoffset_d, sizeof(vid_t) * oe_offsize);
+    cudaMalloc(&oe_edata_d, sizeof(value_t) * oe_offsize);
+    cudaMalloc(&cur_oeoff_d, sizeof(vid_t) * num);
+    cudaMalloc(&size_oe_d, sizeof(vid_t) * num);
+    check();
+
+    unsigned int oe_curIndex = 0;
+    for(int i = 0; i < num; i++){
+      for(int j = 0;j < size_oe_h[i]; j++){
+        value_t* temp  = reinterpret_cast<value_t*>(&oeoffset[i][j].data);//强制转换,原类型为empty不能直接用
+        oe_edata_h[oe_curIndex] = *temp;
+        oeoffset_h[oe_curIndex++] = oeoffset[i][j].neighbor.GetValue();
+      }
+    }
+    
+    values.fake2buffer();
+    deltas.fake2buffer();
+    for(int i = 0;i < num;i++){
+      deltas_h[i] = deltas.data_buffer[i].value;
+    }
+
+    cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * oe_offsize, cudaMemcpyHostToDevice);
+    cudaMemcpy(oe_edata_d, oe_edata_h, sizeof(value_t) * oe_offsize, cudaMemcpyHostToDevice);
+    cudaMemcpy(cur_oeoff_d, cur_oeoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(deltas_d, deltas_h, sizeof(value_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(size_oe_d, size_oe_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    check();
+    if(FLAGS_gpu_start && FLAGS_compress){//SumInc
+
+    }
+    tjnsssp::init(oeoffset_d, oe_edata_d, cur_oeoff_d, deltas_d, values_d, size_oe_d);
     while (true) {
       // LOG(INFO) << "step=" << step << " curr_modified_.size()=" << app_->curr_modified_.ParallelCount(8);
       exec_time -= GetCurrentTime();
@@ -753,7 +813,6 @@ class SumSyncTraversalWorker : public ParallelEngine {
       // app_->next_modified_.ParallelClear(thread_num()); // 对于压缩图清理的范围可以缩小， 直接初始化为小区间！！！！
       app_->next_modified_.ParallelClear(thread_num()); // 对于压缩图清理的范围可以缩小， 直接初始化为小区间！！！！
       // clean_bitset_time += GetCurrentTime();
-
       {
         messages_.ParallelProcess<fragment_t, DependencyData<vid_t, value_t>>(
             thread_num(), *fragment_,
@@ -764,21 +823,20 @@ class SumSyncTraversalWorker : public ParallelEngine {
               }
             });
       }
-
       // Traverse outgoing neighbors
       // for_time -= GetCurrentTime();
       if (FLAGS_cilk) {
         if(compr_stage == false){
           // ForEachCilk(
-          ForEachCilkOfBitset(
+          if(!FLAGS_gpu_start){
+            ForEachCilkOfBitset(
               app_->curr_modified_, inner_vertices, [this, &compr_stage, &count, &step](int tid, vertex_t u) {
                 auto& value = app_->values_[u];
                 auto last_value = value;
                 // We don't cleanup delta with identity element, since we expect
                 // the algorithm is monotonic
                 auto& delta = app_->deltas_[u];
-                // LOG(INFO) << "--- step=" << step << " oid=" << fragment_->GetId(u) << " id=" << u.GetValue() << ": value=" << value << " delta=" << delta.value;
-
+                // LOG(INFO) << "--- step=" << step << " oid=" << fragment_->GetId(u) << " id=" << u.GetValue() << ": value=" << value << " delta=" << delta.value<<"cur modi"<<u.GetValue();
                 if (app_->CombineValueDelta(value, delta)) {
                   app_->Compute(u, last_value, delta, app_->next_modified_);
                   // debug
@@ -790,6 +848,13 @@ class SumSyncTraversalWorker : public ParallelEngine {
                   }
                 }
               });
+          }
+
+          if(FLAGS_gpu_start){
+            tjnsssp::g_function();
+            check();
+          }
+          
         }
         if (compr_stage) {
           ForEachCilkOfBitset(
@@ -938,7 +1003,6 @@ class SumSyncTraversalWorker : public ParallelEngine {
                                                        delta_to_send);
                 }
               });
-
       if (!app_->next_modified_.PartialEmpty(0, fragment_->GetInnerVerticesNum())) {
         messages_.ForceContinue();
       }
@@ -958,8 +1022,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
       exec_time += GetCurrentTime();
 
       bool terminate = messages_.ToTerminate();
-
-      if (terminate) {
+      if (terminate) {//if(app_->next_modified_.Count() == 0)
         if(compr_stage){
           LOG(INFO) << "start correct...";
           // check_result("correct before");
@@ -1103,7 +1166,17 @@ class SumSyncTraversalWorker : public ParallelEngine {
 
       app_->next_modified_.Swap(app_->curr_modified_); // 针对Ingress做动态时, 用这个 
     }
-
+    free(size_oe_h);
+    free(cur_oeoff_h);
+    free(deltas_h);
+    free(oeoffset_h);
+    free(oe_edata_h);
+    cudaFree(deltas_d);
+    cudaFree(values_d);
+    cudaFree(oeoffset_d);
+    cudaFree(oe_edata_d);
+    cudaFree(cur_oeoff_d);
+    cudaFree(size_oe_d);
     // Analysis result
     double d_sum = 0;
     vertex_t source;
@@ -1264,7 +1337,9 @@ class SumSyncTraversalWorker : public ParallelEngine {
     LOG(INFO) << "----------check_result in " << position;
     for (auto v : inner_vertices) {
       // LOG(INFO) << " v.oid=" << cpr_->v2Oid(v); 
+      if(values[v] != app_->GetIdentityElement())
       value_sum += values[v];
+      if(deltas[v].value != app_->GetIdentityElement())
       delta_sum += deltas[v].value;
     }
     printf("---value_sum=%.10lf\n", value_sum);
