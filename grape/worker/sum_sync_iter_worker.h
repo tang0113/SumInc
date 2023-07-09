@@ -670,6 +670,9 @@ class SumSyncIterWorker : public ParallelEngine {
     cudaMalloc(&syncoffset_d, sizeof(vid_t) * sync_offsize);
     cudaMalloc(&is_edata_d, sizeof(value_t) * is_offsize);
     check();
+    LOG(INFO) << "oe size is "<<oe_offsize;
+    LOG(INFO) << "ib size is "<<ib_offsize;
+    LOG(INFO) << "is size is "<<is_offsize;
     cudaMalloc(&cur_oeoff_d, sizeof(vid_t) * num);
     cudaMalloc(&cur_iboff_d, sizeof(vid_t) * cpr_->all_node_num);
     cudaMalloc(&cur_isoff_d, sizeof(vid_t) * cpr_->all_node_num);

@@ -191,6 +191,14 @@ class VertexArray : public Array<T, Allocator<T>> {
     fake_start_ = data_buffer;
   }
 
+  /**
+   * @brief 将从gpu计算的deltas返回
+  */
+  void deltasGet(int *deltas_h){
+    for(int i=0;i<fake_start_.size();i++){
+      fake_start_[i].value = deltas_h[i];
+    }
+  }
   void Init(const VertexRange<VID_T>& range) {
     Base::clear();
     Base::resize(range.size());

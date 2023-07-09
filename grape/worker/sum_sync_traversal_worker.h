@@ -25,6 +25,8 @@
 #include "grape/parallel/parallel_message_manager.h"
 #include "timer.h"
 #include "grape/fragment/trav_compressor.h"
+#include <cuda_runtime.h>
+#include "freshman.h"
 #include "my_ssspworker.cuh"
 
 namespace grape {
@@ -85,9 +87,12 @@ class SumSyncTraversalWorker : public ParallelEngine {
       LOG(INFO) << "cilk Thread num: " << getWorkers();
     }
     LOG(INFO) << "Thread num: " << thread_num();
-
+    
     // allocate dependency arrays
     app_->Init(comm_spec_, fragment_);
+    auto deltas = app_->deltas_;
+    auto values = app_->values_;
+
     // init compressor
     if(FLAGS_compress){
       cpr_ = new TravCompressor<APP_T, supernode_t>(app_, fragment_);
@@ -456,11 +461,11 @@ class SumSyncTraversalWorker : public ParallelEngine {
     cpr_->sketch2csr(inner_node_num, node_type, all_nodes, is_e_, is_e_offset_,
                               ib_e_, ib_e_offset_);
 
-    for(auto t : node_range) {
-      LOG(INFO) << " node_type_range=" << t;
-    }
+    // for(auto t : node_range) {
+    //   LOG(INFO) << " node_type_range=" << t;
+    // }
 
-    {
+    // {
       // check_result("init before");
       exec_time -= GetCurrentTime();
       // app_->next_modified_.Swap(app_->curr_modified_);
@@ -476,55 +481,55 @@ class SumSyncTraversalWorker : public ParallelEngine {
         LOG(INFO) << "this->Fc[source]=" << cpr_->Fc[source];
       }
 
-      LOG(INFO) << "Send one round for supernode...";
-      LOG(INFO) << "  active_node.size=" 
-                << app_->curr_modified_.ParallelCount(8);
-      /* send one round */
-      ForEachCilkOfBitset(
-        app_->curr_modified_, fragment_->InnerVertices(), 
-        [this](int tid, vertex_t u) {
-          // LOG(INFO) << " ---------u.oid" << cpr_->v2Oid(u);
-          // u = vertex_t(oldId2newId[u.GetValue()]);
-          if (node_type[u.GetValue()] < 2) { // 0, 1
-            auto& delta = app_->deltas_[u];
-            if (delta.value != app_->GetIdentityElement()) {
-              auto& value = app_->values_[u];
-              app_->CombineValueDelta(value, delta);
-              adj_list_t oes = adj_list_t(ib_e_offset_[u.GetValue()], ib_e_offset_[u.GetValue()+1]);
-              app_->Compute(u, value, delta, oes, app_->next_modified_);
-            }
-          } else if (node_type[u.GetValue()] < 3) { // 2
-            auto& delta = app_->deltas_[u];
-            if (delta.value != app_->GetIdentityElement()) {
-              auto& value = app_->values_[u];
-              app_->CombineValueDelta(value, delta);
-              adj_list_index_t oes = adj_list_index_t(is_e_offset_[u.GetValue()], is_e_offset_[u.GetValue()+1]);
-              app_->ComputeByIndexDelta(u, value, delta, oes, app_->next_modified_);
-            }
-          } else if (node_type[u.GetValue()] < 4) { // 3
-            auto& delta = app_->deltas_[u];
-            if (delta.value != app_->GetIdentityElement()) {
-              auto& value = app_->values_[u];
-              app_->CombineValueDelta(value, delta);
-              /* 1: bound node */
-              adj_list_t oes_b = adj_list_t(ib_e_offset_[u.GetValue()], ib_e_offset_[u.GetValue()+1]);
-              app_->Compute(u, value, delta, oes_b, app_->next_modified_);
-              /* 2: source node */
-              adj_list_index_t oes_s = adj_list_index_t(is_e_offset_[u.GetValue()], is_e_offset_[u.GetValue()+1]);
-              app_->ComputeByIndexDelta(u, value, delta, oes_s, app_->next_modified_);
-            }
-          }
-      });
-      app_->next_modified_.Swap(app_->curr_modified_);
-      exec_time += GetCurrentTime();
-      LOG(INFO) << " pre_exec_time=" << exec_time;
-      LOG(INFO) << " init after bitset.size=" << app_->curr_modified_.ParallelCount(thread_num());
-      LOG(INFO) << " init after curr_modified_new.size=" 
-                << app_->curr_modified_.ParallelCount(thread_num());
-    }
+    //   LOG(INFO) << "Send one round for supernode...";
+    //   LOG(INFO) << "  active_node.size=" 
+    //             << app_->curr_modified_.ParallelCount(8);
+    //   /* send one round */
+    //   ForEachCilkOfBitset(
+    //     app_->curr_modified_, fragment_->InnerVertices(), 
+    //     [this](int tid, vertex_t u) {
+    //       // LOG(INFO) << " ---------u.oid" << cpr_->v2Oid(u);
+    //       // u = vertex_t(oldId2newId[u.GetValue()]);
+    //       if (node_type[u.GetValue()] < 2) { // 0, 1
+    //         auto& delta = app_->deltas_[u];
+    //         if (delta.value != app_->GetIdentityElement()) {
+    //           auto& value = app_->values_[u];
+    //           app_->CombineValueDelta(value, delta);
+    //           adj_list_t oes = adj_list_t(ib_e_offset_[u.GetValue()], ib_e_offset_[u.GetValue()+1]);
+    //           app_->Compute(u, value, delta, oes, app_->next_modified_);
+    //         }
+    //       } else if (node_type[u.GetValue()] < 3) { // 2
+    //         auto& delta = app_->deltas_[u];
+    //         if (delta.value != app_->GetIdentityElement()) {
+    //           auto& value = app_->values_[u];
+    //           app_->CombineValueDelta(value, delta);
+    //           adj_list_index_t oes = adj_list_index_t(is_e_offset_[u.GetValue()], is_e_offset_[u.GetValue()+1]);
+    //           app_->ComputeByIndexDelta(u, value, delta, oes, app_->next_modified_);
+    //         }
+    //       } else if (node_type[u.GetValue()] < 4) { // 3
+    //         auto& delta = app_->deltas_[u];
+    //         if (delta.value != app_->GetIdentityElement()) {
+    //           auto& value = app_->values_[u];
+    //           app_->CombineValueDelta(value, delta);
+    //           /* 1: bound node */
+    //           adj_list_t oes_b = adj_list_t(ib_e_offset_[u.GetValue()], ib_e_offset_[u.GetValue()+1]);
+    //           app_->Compute(u, value, delta, oes_b, app_->next_modified_);
+    //           /* 2: source node */
+    //           adj_list_index_t oes_s = adj_list_index_t(is_e_offset_[u.GetValue()], is_e_offset_[u.GetValue()+1]);
+    //           app_->ComputeByIndexDelta(u, value, delta, oes_s, app_->next_modified_);
+    //         }
+    //       }
+    //   });
+    //   app_->next_modified_.Swap(app_->curr_modified_);
+    //   exec_time += GetCurrentTime();
+    //   LOG(INFO) << " pre_exec_time=" << exec_time;
+    //   LOG(INFO) << " init after bitset.size=" << app_->curr_modified_.ParallelCount(thread_num());
+    //   LOG(INFO) << " init after curr_modified_new.size=" 
+    //             << app_->curr_modified_.ParallelCount(thread_num());
+    // }
     
-    LOG(INFO) << "extra_all_time=" << (GetCurrentTime()- extra_all_time);
-    print_active_edge("#pre_exec");
+    // LOG(INFO) << "extra_all_time=" << (GetCurrentTime()- extra_all_time);
+    // print_active_edge("#pre_exec");
   }
 
   void Query() {
@@ -701,7 +706,24 @@ class SumSyncTraversalWorker : public ParallelEngine {
 // #define DEBUG
     if (compr_stage == true) {
       // app_->next_modified_.Swap(app_->curr_modified_);
-      first_step(values_temp, deltas_temp, exec_time, false);
+      if(!FLAGS_gpu_start){
+        first_step(values_temp, deltas_temp, exec_time, false);
+      }else{
+        double extra_all_time = GetCurrentTime();
+        auto inner_vertices = fragment_->InnerVertices();
+        vid_t inner_node_num = inner_vertices.end().GetValue() 
+                            - inner_vertices.begin().GetValue();
+    
+        cpr_->get_nodetype(inner_node_num, node_type);
+        cpr_->sketch2csr(inner_node_num, node_type, all_nodes, is_e_, is_e_offset_,
+                              ib_e_, ib_e_offset_);
+        vertex_t source;
+        bool native_source = fragment_->GetInnerVertex(FLAGS_sssp_source, source);
+        if (native_source) {
+          app_->curr_modified_.Insert(source);
+        }
+        // first_step(values_temp, deltas_temp, exec_time, false);
+      }
     }
 
     if (compr_stage == false) {
@@ -747,7 +769,16 @@ class SumSyncTraversalWorker : public ParallelEngine {
     //Ingress,使用gpu,分配内存,传输数据,初始化
 
     vid_t *size_oe_d, *size_oe_h = (vid_t *)malloc(sizeof(vid_t) * num);//Ingress,用于记录每一个顶点的邻居数
+    vid_t *size_ib_d, *size_ib_h = (vid_t *)malloc(sizeof(vid_t) * num);//SumInc,node type:SingleNode
+    vid_t *size_is_d, *size_is_h = (vid_t *)malloc(sizeof(vid_t) * num);//SumInc,node type:OnlyInNode
+
     vid_t *cur_oeoff_d, *cur_oeoff_h = (vid_t *)malloc(sizeof(vid_t) * num);//Ingress,用于记录每一个顶点在邻居大链表中开始的偏移量
+    vid_t *cur_iboff_d, *cur_iboff_h = (vid_t *)malloc(sizeof(vid_t) * num);
+    vid_t *cur_isoff_d, *cur_isoff_h = (vid_t *)malloc(sizeof(vid_t) * num);
+
+    vid_t *cur_modified_d, *next_modified_d;
+    vid_t *cur_modified_size_d, *next_modified_size_d;
+    vid_t *cur_modified_size_h = (vid_t *)malloc(sizeof(vid_t) * 1);
 
     unsigned int oe_offsize = 0;//临时变量
     for(int i = 0;i < num; i++){//Ingress
@@ -756,50 +787,170 @@ class SumSyncTraversalWorker : public ParallelEngine {
       size_oe_h[i] = oeoffset[i+1] - oeoffset[i];
     }
 
+    unsigned int ib_offsize = 0;
+    if(compr_stage){
+      for(int i = 0;i < num;i++){//SumInc
+        cur_iboff_h[i] = ib_offsize;
+        ib_offsize += ib_e_offset_[i+1] - ib_e_offset_[i];
+        size_ib_h[i] = ib_e_offset_[i+1] - ib_e_offset_[i];
+      }
+    }
+    
+    unsigned int is_offsize = 0;
+    if(compr_stage){
+      for(int i=0;i < num;i++){
+        cur_isoff_h[i] = is_offsize;
+        is_offsize += is_e_offset_[i+1] - is_e_offset_[i];
+        size_is_h[i] = is_e_offset_[i+1] - is_e_offset_[i];
+      }
+    }
+
     auto &values = app_->values_;
     auto &deltas = app_->deltas_;
     value_t *deltas_d, *deltas_h = (value_t *)malloc(sizeof(value_t) * num);
     value_t *values_d;
 
     vid_t *oeoffset_d, *oeoffset_h = (vid_t *)malloc(sizeof(vid_t) * oe_offsize);//Ingress,记录每个顶点的邻居，形成一条链表
+    vid_t *iboffset_d, *iboffset_h = (vid_t *)malloc(sizeof(vid_t) * ib_offsize);//SumInc
+    vid_t *isoffset_d, *isoffset_h = (vid_t *)malloc(sizeof(vid_t) * is_offsize);//SumInc
+
     value_t *oe_edata_d, *oe_edata_h = (value_t *)malloc(sizeof(value_t) * oe_offsize);
+    value_t *ib_edata_d, *ib_edata_h = (value_t *)malloc(sizeof(value_t) * ib_offsize);
+    value_t *is_edata_d, *is_edata_h = (value_t *)malloc(sizeof(value_t) * is_offsize);
+    char *node_type_d, *node_type_h = (char *)malloc(sizeof(char) * num);//SumInc,记录每个顶点的类型
+
+
 
     cudaSetDevice(0);
-
-    cudaMalloc(&deltas_d, sizeof(value_t) * num);
-    cudaMalloc(&values_d, sizeof(value_t) * num);
+    //deltas和values
+    cudaMalloc(&deltas_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num));
+    cudaMalloc(&values_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num));
+    check();
+    //邻居大列表,所有点的邻接表拼接而成
     cudaMalloc(&oeoffset_d, sizeof(vid_t) * oe_offsize);
+    cudaMalloc(&iboffset_d, sizeof(vid_t) * ib_offsize);
+    cudaMalloc(&isoffset_d, sizeof(vid_t) * is_offsize);
+    LOG(INFO) << "delta size is "<<deltas.size();
+    LOG(INFO) << "valuesize is "<<values.size();
+    LOG(INFO) << "is size is "<<is_offsize;
+    check();
+    //边数据
     cudaMalloc(&oe_edata_d, sizeof(value_t) * oe_offsize);
+    cudaMalloc(&ib_edata_d, sizeof(value_t) * ib_offsize);
+    cudaMalloc(&is_edata_d, sizeof(value_t) * is_offsize);
+    check();
+    //记录每个点的邻接表在其邻居大列表中的起始位置
     cudaMalloc(&cur_oeoff_d, sizeof(vid_t) * num);
+    cudaMalloc(&cur_iboff_d, sizeof(vid_t) * num);
+    cudaMalloc(&cur_isoff_d, sizeof(vid_t) * num);
+    check();
+    //记录每个点的邻居数量
     cudaMalloc(&size_oe_d, sizeof(vid_t) * num);
+    cudaMalloc(&size_ib_d, sizeof(vid_t) * num);
+    cudaMalloc(&size_is_d, sizeof(vid_t) * num);
+    check();
+    //顶点类型
+    cudaMalloc(&node_type_d, sizeof(char) * num);
+    //当前要修改的点,下一个要修改的点
+    cudaMalloc(&cur_modified_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num));
+    cudaMalloc(&next_modified_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num));
+    check();
+    //当前要修改的点数量
+    cudaMalloc(&cur_modified_size_d, sizeof(vid_t) * 1);
+    //下一次每个顶点要加入修改的目的顶点数量,设置为num目的是使用GPU时防止多个线程对全局变量同时进行修改
+    cudaMalloc(&next_modified_size_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num));
     check();
 
-    unsigned int oe_curIndex = 0;
-    for(int i = 0; i < num; i++){
-      for(int j = 0;j < size_oe_h[i]; j++){
-        value_t* temp  = reinterpret_cast<value_t*>(&oeoffset[i][j].data);//强制转换,原类型为empty不能直接用
-        oe_edata_h[oe_curIndex] = *temp;
-        oeoffset_h[oe_curIndex++] = oeoffset[i][j].neighbor.GetValue();
+    unsigned int oe_curIndex = 0, ib_curIndex = 0, is_curIndex = 0;
+
+    //根据压缩或者不压缩进行不同的初始化
+    if(FLAGS_compress){
+      for(int i = 0,k = 0; i < num; i++,k++){
+        if(k < num)//启用压缩时node_type才有效
+          node_type_h[k] = node_type[k];
+        if(k < num){
+          for(int j = 0;j < size_oe_h[k]; j++){
+            value_t* temp = reinterpret_cast<value_t*>(&oeoffset[i][j].data);//强制转换,原类型为empty不能直接用
+            oe_edata_h[oe_curIndex] = *temp;
+            oeoffset_h[oe_curIndex++] = oeoffset[i][j].neighbor.GetValue();
+          }
+        }
+        for(int j = 0;j < size_is_h[i]; j++){
+          is_edata_h[is_curIndex] = is_e_offset_[i][j].data.value;
+          isoffset_h[is_curIndex++] = is_e_offset_[i][j].neighbor.GetValue();
+        }
+        for(int j = 0;j < size_ib_h[i];j++){
+          value_t* temp = reinterpret_cast<value_t*>(&ib_e_offset_[i][j].data);//强制转换,原类型为empty不能直接用
+          ib_edata_h[ib_curIndex] = *temp;
+          iboffset_h[ib_curIndex++] = ib_e_offset_[i][j].neighbor.GetValue();
+        }
       }
     }
+    if(!FLAGS_compress){
+      for(int i = 0; i < num; i++){
+        for(int j = 0;j < size_oe_h[i]; j++){
+            value_t* temp = reinterpret_cast<value_t*>(&oeoffset[i][j].data);//强制转换,原类型为empty不能直接用
+            oe_edata_h[oe_curIndex] = *temp;
+            oeoffset_h[oe_curIndex++] = oeoffset[i][j].neighbor.GetValue();
+          }
+      }
+    }
+    
     
     values.fake2buffer();
     deltas.fake2buffer();
     for(int i = 0;i < num;i++){
       deltas_h[i] = deltas.data_buffer[i].value;
     }
-
     cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * oe_offsize, cudaMemcpyHostToDevice);
+    cudaMemcpy(iboffset_d, iboffset_h, sizeof(vid_t) * ib_offsize, cudaMemcpyHostToDevice);
+    cudaMemcpy(isoffset_d, isoffset_h, sizeof(vid_t) * is_offsize, cudaMemcpyHostToDevice);
+
     cudaMemcpy(oe_edata_d, oe_edata_h, sizeof(value_t) * oe_offsize, cudaMemcpyHostToDevice);
+    cudaMemcpy(ib_edata_d, ib_edata_h, sizeof(value_t) * ib_offsize, cudaMemcpyHostToDevice);
+    cudaMemcpy(is_edata_d, is_edata_h, sizeof(value_t) * is_offsize, cudaMemcpyHostToDevice);
+
     cudaMemcpy(cur_oeoff_d, cur_oeoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
-    cudaMemcpy(deltas_d, deltas_h, sizeof(value_t) * num, cudaMemcpyHostToDevice);
-    cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(cur_iboff_d, cur_iboff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(cur_isoff_d, cur_isoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+
+    cudaMemcpy(deltas_d, deltas_h, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
+    cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
+
     cudaMemcpy(size_oe_d, size_oe_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(size_ib_d, size_ib_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+    cudaMemcpy(size_is_d, size_is_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
     check();
     if(FLAGS_gpu_start && FLAGS_compress){//SumInc
 
     }
-    tjnsssp::init(oeoffset_d, oe_edata_d, cur_oeoff_d, deltas_d, values_d, size_oe_d);
+    LOG(INFO) <<"cur size is "<< app_->curr_modified_.Count();
+    vertex_t u(0);
+    LOG(INFO) << "cur node is" << app_->curr_modified_.Exist(u);
+    unsigned int sssp_source = FLAGS_sssp_source;
+    if(!app_->curr_modified_.Exist(vertex_t(sssp_source))){
+      for(int i = 0;i<num;i++){
+        vertex_t u(sssp_source+i);
+        vertex_t v(sssp_source-i);
+        if(app_->curr_modified_.Exist(v)){
+          sssp_source -= i;
+          break;
+        }
+        if(app_->curr_modified_.Exist(u)){
+          sssp_source += i;
+          break;
+        }
+      }
+    }
+    LOG(INFO) << "source is "<<sssp_source;
+    tjnsssp::init(oeoffset_d, oe_edata_d, cur_oeoff_d, deltas_d, values_d, size_oe_d, sssp_source, 
+                  cur_modified_d, next_modified_d, cur_modified_size_d, next_modified_size_d, 
+                  iboffset_d, ib_edata_d, cur_iboff_d, size_ib_d, 
+                  isoffset_d, is_edata_d, cur_isoff_d, size_is_d, 
+                  node_type_d);
+                  check();
+    check();
+
     while (true) {
       // LOG(INFO) << "step=" << step << " curr_modified_.size()=" << app_->curr_modified_.ParallelCount(8);
       exec_time -= GetCurrentTime();
@@ -851,13 +1002,17 @@ class SumSyncTraversalWorker : public ParallelEngine {
           }
 
           if(FLAGS_gpu_start){
-            tjnsssp::g_function();
-            check();
+            cudaMemcpy(cur_modified_size_h, cur_modified_size_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
+            // check();
+            tjnsssp::g_function(cur_modified_size_h);
+            // check();
+            cudaMemcpy(cur_modified_size_h, cur_modified_size_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
           }
           
         }
         if (compr_stage) {
-          ForEachCilkOfBitset(
+          if(!FLAGS_gpu_start){
+            ForEachCilkOfBitset(
             app_->curr_modified_, fragment_->InnerVertices(), 
             [this](int tid, vertex_t u) {
               if (node_type[u.GetValue()] < 2) { // 0, 1
@@ -892,7 +1047,13 @@ class SumSyncTraversalWorker : public ParallelEngine {
                   app_->ComputeByIndexDelta(u, value, delta, oes_s, app_->next_modified_);
                 }
               }
-          });
+            });
+          }
+          if(FLAGS_gpu_start){
+            cudaMemcpy(cur_modified_size_h, cur_modified_size_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
+            tjnsssp::g_function_compr(cur_modified_size_h);
+          }
+          
         }
       } else {
         if (compr_stage == false) {
@@ -987,7 +1148,6 @@ class SumSyncTraversalWorker : public ParallelEngine {
       // for_time += GetCurrentTime();
 
       auto& channels = messages_.Channels();
-
       // send local delta to remote
       ForEach(app_->next_modified_, outer_vertices,
               [&channels, vm_ptr, fid, this](int tid, vertex_t v) {
@@ -1022,7 +1182,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
       exec_time += GetCurrentTime();
 
       bool terminate = messages_.ToTerminate();
-      if (terminate) {//if(app_->next_modified_.Count() == 0)
+      if ( (terminate && !FLAGS_gpu_start) || (!cur_modified_size_h[0] && FLAGS_gpu_start) ) {//if(app_->next_modified_.Count() == 0)
         if(compr_stage){
           LOG(INFO) << "start correct...";
           // check_result("correct before");
@@ -1166,17 +1326,42 @@ class SumSyncTraversalWorker : public ParallelEngine {
 
       app_->next_modified_.Swap(app_->curr_modified_); // 针对Ingress做动态时, 用这个 
     }
+    
     free(size_oe_h);
+    free(size_ib_h);
+    free(size_is_h);
+
     free(cur_oeoff_h);
+    free(cur_iboff_h);
+    free(cur_isoff_h);
+
     free(deltas_h);
     free(oeoffset_h);
+    free(iboffset_h);
+    free(isoffset_h);
+
     free(oe_edata_h);
+    free(ib_edata_h);
+    free(is_edata_h);
+
     cudaFree(deltas_d);
     cudaFree(values_d);
+
     cudaFree(oeoffset_d);
+    cudaFree(iboffset_d);
+    cudaFree(isoffset_d);
+
     cudaFree(oe_edata_d);
+    cudaFree(ib_edata_d);
+    cudaFree(is_edata_d);
+
     cudaFree(cur_oeoff_d);
+    cudaFree(cur_iboff_d);
+    cudaFree(cur_isoff_d);
+
     cudaFree(size_oe_d);
+    cudaFree(size_ib_d);
+    cudaFree(size_is_d);
     // Analysis result
     double d_sum = 0;
     vertex_t source;
@@ -1194,6 +1379,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
       }
     }
     LOG(INFO) << "max_d[" << fragment_->GetId(vertex_t(max_id)) << "]=" << app_->values_[vertex_t(max_id)];
+    LOG(INFO) << "max id in suminc is"<<max_id;
     LOG(INFO) << "d_sum=" << d_sum;
     printf("#d_sum: %.10lf\n", d_sum);
     LOG(INFO) << "count=" << count;

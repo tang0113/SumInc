@@ -123,16 +123,18 @@ class TraversalAppBase {
 
     for (auto v : inner_vertices) {
       values_[v] = GetInitValue(v);
+      // LOG(INFO) << "inner vetices has"<<v.GetValue();
     }
 
     for (auto v : vertices) {
       deltas_[v] = GetInitDelta(v);
+      // LOG(INFO) << "vetices has"<<v.GetValue();
 
       // if (deltas_[v].value != GetIdentityElement()) {
       //   curr_modified_.Insert(v);
       // }
     }
-
+    
     uint64_t memory = 0, global_mem;
     memory += curr_modified_.Range().size() / 64;
     memory += next_modified_.Range().size() / 64;
