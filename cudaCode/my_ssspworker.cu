@@ -24,32 +24,40 @@ namespace tjnsssp{
 
     __device__ unsigned int *cur_modified_d;
     __device__ unsigned int *cur_modified_size_d;//长度为1,只记录当前修改队列的长度
-    __device__ unsigned int *next_modified_d;
-    __device__ unsigned int *next_modified_size_d;//长度为num,记录每个modified顶点产生的新的modified顶点数量,这里设为num的作用是使得每个线程能正确处理当前顶点产生的新modified
+    // __device__ unsigned int *next_modified_d;
+    // __device__ unsigned int *next_modified_size_d;//长度为num,记录每个modified顶点产生的新的modified顶点数量,这里设为num的作用是使得每个线程能正确处理当前顶点产生的新modified
     __device__ unsigned int next_modified_allsize_d;
+    __device__ unsigned int *is_modified_d;//记录顶点是否被修改
+    __device__ unsigned int num;
 
     __device__ char *node_type_d;
+
+    __device__ int *sem;
+    __device__ int curpos = 0;
     
     void init(unsigned int *oeoffset_d, int *oe_edata_d, unsigned int *cur_oeoff_d, int *deltas_d, int *values_d, unsigned int *size_oe_d, int FLAGS_sssp_source, 
-              unsigned int *cur_modified_d, unsigned int *next_modified_d, unsigned int *cur_modified_size_d, unsigned int *next_modified_size_d, 
+              unsigned int *cur_modified_d, unsigned int *cur_modified_size_d, unsigned int *is_modified_d, unsigned int num, 
               unsigned int *iboffset_d, int *ib_edata_d, unsigned int *cur_iboff_d, unsigned int *size_ib_d, 
               unsigned int *isoffset_d, int *is_edata_d, unsigned int *cur_isoff_d, unsigned int *size_is_d, 
               char *node_type_d){
 
+                int *sem_d;
+                cudaMalloc(&sem_d, sizeof(int) *1);
+
         init_real<<<1,1>>>(oeoffset_d, oe_edata_d, cur_oeoff_d, deltas_d, values_d, size_oe_d, FLAGS_sssp_source, 
-                           cur_modified_d, next_modified_d, cur_modified_size_d, next_modified_size_d, 
+                           cur_modified_d, cur_modified_size_d, is_modified_d, num, 
                            iboffset_d, ib_edata_d, cur_iboff_d, size_ib_d, 
                            isoffset_d, is_edata_d, cur_isoff_d, size_is_d, 
-                           node_type_d);
+                           node_type_d, sem_d);
 
     }
 
     __global__
     void init_real(unsigned int *oeoffset_d, int *oe_edata_d, unsigned int *cur_oeoff_d, int *deltas_d, int *values_d, unsigned int *size_oe_d, int FLAGS_sssp_source, 
-              unsigned int *cur_modified_d, unsigned int *next_modified_d, unsigned int *cur_modified_size_d, unsigned int *next_modified_size_d, 
+              unsigned int *cur_modified_d, unsigned int *cur_modified_size_d, unsigned int *is_modified_d, unsigned int num, 
               unsigned int *iboffset_d, int *ib_edata_d, unsigned int *cur_iboff_d, unsigned int *size_ib_d, 
               unsigned int *isoffset_d, int *is_edata_d, unsigned int *cur_isoff_d, unsigned int *size_is_d, 
-              char *node_type_d){
+              char *node_type_d, int *sem_d){
 
         tjnsssp::oeoffset_d = oeoffset_d;
         tjnsssp::iboffset_d = iboffset_d;
@@ -72,39 +80,49 @@ namespace tjnsssp{
         tjnsssp::cur_modified_size_d = cur_modified_size_d;
         tjnsssp::cur_modified_size_d[0] = 1;
 
-        tjnsssp::next_modified_size_d = next_modified_size_d;
-
         tjnsssp::cur_modified_d = cur_modified_d;
         tjnsssp::cur_modified_d[0] = FLAGS_sssp_source;
         
-        tjnsssp::next_modified_d = next_modified_d;
+        tjnsssp::num = num;
+        tjnsssp::is_modified_d = is_modified_d;
 
         tjnsssp::node_type_d = node_type_d;
+        tjnsssp::sem = sem_d;
+        tjnsssp::sem[0] = 0;
+        
 
         // cudaFree(tjnsssp::next_modified_size);
     }
 
-    void g_function(unsigned int *cur_modified_size_h){
-
+    void g_function(unsigned int *cur_modified_size_h, unsigned int num){
         dim3 block(512);
         dim3 grid((cur_modified_size_h[0] - 1) / block.x + 1);
 
         // printf("cur modified size is %d", cur_modified_size_h[0]);
         g_function_real<<<grid, block>>>();
+        
+
         cudaDeviceSynchronize();
         // unsigned int *next_modified_size_h = (unsigned int *)malloc(sizeof(unsigned int) * 1);
         // unsigned int *next_modified_size_d; cudaMalloc(&next_modified_size_d, sizeof(unsigned int) * 1);
 
-        swap();
-        // 
+
+        dim3 block1(512);
+        dim3 grid1((num-1) / block1.x + 1);
+        setNextSize<<<grid1, block1>>>();
+        cudaDeviceSynchronize();
+
+        swap(num);
+
+        clear(num);
     }
 
-    void g_function_compr(unsigned int *cur_modified_size_h){
+    void g_function_compr(unsigned int *cur_modified_size_h, unsigned int cpr_num){
         dim3 block(512);
         dim3 grid((cur_modified_size_h[0] - 1) / block.x + 1);
         g_function_compr_real<<<grid, block>>>();
         cudaDeviceSynchronize();
-        swap();
+        // swap();
     }
 
     __global__
@@ -145,44 +163,158 @@ namespace tjnsssp{
     }
 
     
-    void swap(){
-        // dim3 block(512);
-        // dim3 grid((next_modified_size_h[0] - 1) / block.x + 1);
-        // swap_real<<<grid, block>>>();
-        // cudaDeviceSynchronize();
+    void swap(unsigned int num){
+        cudaEvent_t startCuda, stopCuda;  //declare
+        cudaEventCreate(&startCuda);      //set up 
+        cudaEventCreate(&stopCuda);       //set up
+        cudaEventRecord(startCuda,0);    //start
+        
+        unsigned int *next_modified_allsize_h = (unsigned int *)malloc(sizeof(unsigned int) * 1);
+        unsigned int *next_modified_allsize_temp;
+        cudaMalloc(&next_modified_allsize_temp, sizeof(unsigned int)*1);
 
-        swap_real<<<1,1>>>();
+        getAllSize<<<1, 1>>>(next_modified_allsize_temp);
+        cudaMemcpy(next_modified_allsize_h, next_modified_allsize_temp, sizeof(unsigned int) * 1, cudaMemcpyDeviceToHost);
+
+        dim3 block(512);
+        dim3 grid((num - 1) / block.x + 1);
+
+        swap_real<<<grid, block>>>();
+        cudaEventRecord(stopCuda,0);     //finish
+        cudaEventSynchronize(stopCuda);
         cudaDeviceSynchronize();
+        float eTime;
+        cudaEventElapsedTime(&eTime, startCuda, stopCuda);  
+        //eTime = stoptime - starttime
+        printf("time is %f\n",eTime);
+
+        cudaFree(next_modified_allsize_temp);
+        free(next_modified_allsize_h);
     }
 
     __global__
     void swap_real(){
-        for(unsigned int i = 0; i < next_modified_allsize_d; i++){
-            cur_modified_d[i] = next_modified_d[i];
-        }
-        for(unsigned int i = 0;i < cur_modified_size_d[0];i++){
-            next_modified_size_d[i] = 0;
-        }
-        cur_modified_size_d[0] = next_modified_allsize_d;
-        next_modified_allsize_d = 0;
-        unsigned int temp = 0;
-        int maxid = 0;
-        if(cur_modified_size_d[0] == 0){
-            for(int i=0;i<2400000;i++){
-                if(values_d[i] < 2147483647){
-                    temp = max(values_d[i], temp);
-                    maxid = values_d[i] >= temp ? i : maxid;
+        int index = threadIdx.x + blockIdx.x * blockDim.x;
+        if(index < num){
+            if(is_modified_d[index]){
+                
+                // acquire_semaphore();
+                for (int i = 0; i < 32; i++) {
+                    // Check if it is this thread's turn
+                    if (index % 32 != i)
+                        continue;
+
+                    // Lock
+                    while (atomicExch(sem, 1) == 1)
+                        ;
+                    // Work
+                    cur_modified_d[curpos] = index;
+                    curpos++;
+                    // Unlock
+                    *sem = 0;
                 }
-                if(i == 1539735){
-                    printf("values1539735 is %u,",values_d[i]);
-                }
-                if(i == 2321775){
-                    printf("values2321775 is %u,",values_d[i]);
-                }
+                // while(true){
+                //     // printf("sem = %d",sem);
+                //     if(atomicExch(sem,1) != 1){
+                //         printf("sem = %d",*sem);
+                //         cur_modified_d[curpos] = index;
+                //         curpos++;
+                //         printf("sem = %d",*sem);
+                //         *sem = 0;printf("sem = %d",*sem);
+                //         break;
+                //     }
+                // }
+                
+                // cur_modified_d[curpos] = index;
+                // curpos++;
+                // printf("111");
+                // sem = 0;
+                // __syncthreads();
             }
-            printf("values max is %u, i max is %d\n\n",temp,maxid);
         }
         
+        // if(index < next_modified_allsize_d){
+        //     int number = index + 1;
+        //     for(unsigned int i = 0; i < num; i++){
+        //         if(is_modified_d[i]){
+        //             number--;
+        //         }
+        //         if(number == 0){
+        //             cur_modified_d[index] = i;
+        //             break;
+        //         }
+        //     }
+        //     cur_modified_size_d[0] = next_modified_allsize_d;
+        // }
+        if(next_modified_allsize_d == 0 && index == 0){
+            cur_modified_size_d[0] = 0;
+            int maxid = 0;
+            int maxvalue = 0;
+            for(int i=0;i<3000000;i++){
+                if(values_d[i] !=  2147483647 && values_d[i] > maxvalue){
+                    maxvalue = values_d[i];
+                    maxid = i;
+                }
+            }
+            printf("max values[%d] is %d",maxid,values_d[maxid]);
+            printf("-------------------------------end-------------------------------");
+        }
+    }
+
+    void clear(unsigned int num){
+        dim3 block(512);
+        dim3 grid((num-1) / block.x + 1);
+        clear_real<<<grid, block>>>();
+    }
+
+    __global__
+    void clear_real(){
+
+        int index = threadIdx.x + blockIdx.x * blockDim.x;
+        
+
+        if(index < num)
+            is_modified_d[index] = 0;
+
+        next_modified_allsize_d = 0;
+        curpos = 0;
+
+    }
+
+    __global__
+    void setNextSize(){
+        int index = threadIdx.x + blockIdx.x * blockDim.x;
+        if(index < num && is_modified_d[index]){
+            atomicAdd(&next_modified_allsize_d, 1);
+        }
+    }
+
+    __global__
+    void getAllSize(unsigned int *next_modified_allsize_temp){
+        next_modified_allsize_temp[0] = next_modified_allsize_d;
+        cur_modified_size_d[0] = next_modified_allsize_d;
+    }
+
+    __device__ 
+    void acquire_semaphore(){
+        // int index = threadIdx.x + blockIdx.x * blockDim.x;
+        // int temp = atomicCAS(&sem, 0, 1);
+        // printf("temp hhh is %d",temp);
+        // if(temp == 0){
+        //     if(index == 2)printf("no");
+        //     return ;
+        // }
+        // while (temp != 0){
+        //     temp = atomicCAS(&sem, 0, 1);
+        //     // printf("temp while is %d index is %d sem is %d\n",temp,index,sem);
+        // }
+        
+    }
+
+    __device__ 
+    void release_sem(){
+        // sem = 0;
+        // printf("sem is 0");
     }
 
     __device__
@@ -199,52 +331,11 @@ namespace tjnsssp{
                 // int new_dist = oe_edata_d[i] + deltas_d[cur_modified_node];//权重图
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                 if(new_dist < deltas_d[dist_node]){
-                    atomicAdd(&next_modified_size_d[index], 1);
-                    atomicAdd(&next_modified_allsize_d, 1);
-                }
-            }
-            __syncthreads();
-            __threadfence();
-            unsigned int cur_pos = 0;
-            unsigned int offset = 0;
-            for(int i=0;i<index;i++){
-                offset += next_modified_size_d[i];
-            }
-            __syncthreads();
-            __threadfence();
-            for(unsigned int i = cur_oeoff_d[cur_modified_node]; i < size_oe_d[cur_modified_node] + cur_oeoff_d[cur_modified_node]; i++){
-                unsigned int dist_node = oeoffset_d[i];
-                // int new_dist = oe_edata_d[i] + deltas_d[cur_modified_node];//权重图
-                int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
-                if(new_dist < deltas_d[dist_node]){
                     atomicMin(&deltas_d[dist_node], new_dist);
-                    atomicExch(&next_modified_d[offset + cur_pos], dist_node);
-                    cur_pos++;
-                    
+                    atomicExch(&is_modified_d[dist_node], 1);
                 }
             }
-            __syncthreads();
-            __threadfence();
         }
-        /**
-         *  以下写法是错误的
-         * 假如有3个线程,执行完a代码行之后同时执行b代码行,那么相当于对全局内存依次修改(原子操作),全部执行b操作之后再执行c
-         * 而c行的目的是执行完b之后马上执行自增,这显然是不能办到的
-        */
-        // if(values_d[cur_modified_node] > deltas_d[cur_modified_node]){
-        //     // values_d[cur_modified_node] = deltas_d[cur_modified_node];
-        //     atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
-        //     for(unsigned int i = cur_oeoff_d[cur_modified_node]; i < size_oe_d[cur_modified_node] + cur_oeoff_d[cur_modified_node]; i++){
-        //         unsigned int dist_node = oeoffset_d[i];
-        //         // int new_dist = oe_edata_d[i] + deltas_d[cur_modified_node];//权重图
-        //         int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
-        //         if(new_dist < deltas_d[dist_node]){
-        //             atomicMin(&deltas_d[dist_node], new_dist);//a
-        //             atomicExch(&next_modified_d[0], dist_node);//b
-        //             atomicAdd(&next_modified_d[0],1);//c
-        //         }
-        //     }
-        // }
         __syncthreads();
         __threadfence();
     }
@@ -263,54 +354,11 @@ namespace tjnsssp{
                 // int new_dist = ib_edata_d[i] + deltas_d[cur_modified_node];//权重图
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                 if(new_dist < deltas_d[dist_node]){
-                    atomicAdd(&next_modified_size_d[index], 1);
-                    atomicAdd(&next_modified_allsize_d, 1);
-                }
-            }
-            __syncthreads();
-            __threadfence();
-            unsigned int cur_pos = 0;
-            unsigned int offset = 0;
-            for(int i=0;i<index;i++){
-                offset += next_modified_size_d[i];
-            }
-            __syncthreads();
-            __threadfence();
-            for(unsigned int i = cur_iboff_d[cur_modified_node]; i < size_ib_d[cur_modified_node] + cur_iboff_d[cur_modified_node]; i++){
-                unsigned int dist_node = iboffset_d[i];
-                // int new_dist = ib_edata_d[i] + deltas_d[cur_modified_node];//权重图
-                int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
-                if(new_dist < deltas_d[dist_node]){
                     atomicMin(&deltas_d[dist_node], new_dist);
-                    atomicExch(&next_modified_d[offset + cur_pos], dist_node);
-                    cur_pos++;
-                    
+                    atomicExch(&is_modified_d[dist_node], 1);
                 }
             }
-            __syncthreads();
-            __threadfence();
         }
-        /**
-         *  以下写法是错误的
-         * 假如有3个线程,执行完a代码行之后同时执行b代码行,那么相当于对全局内存依次修改(原子操作),全部执行b操作之后再执行c
-         * 而c行的目的是执行完b之后马上执行自增,这显然是不能办到的
-        */
-        // if(values_d[cur_modified_node] > deltas_d[cur_modified_node]){
-        //     // values_d[cur_modified_node] = deltas_d[cur_modified_node];
-        //     atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
-        //     for(unsigned int i = cur_oeoff_d[cur_modified_node]; i < size_oe_d[cur_modified_node] + cur_oeoff_d[cur_modified_node]; i++){
-        //         unsigned int dist_node = oeoffset_d[i];
-        //         // int new_dist = oe_edata_d[i] + deltas_d[cur_modified_node];//权重图
-        //         int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
-        //         if(new_dist < deltas_d[dist_node]){
-        //             atomicMin(&deltas_d[dist_node], new_dist);//a
-        //             atomicExch(&next_modified_d[0], dist_node);//b
-        //             atomicAdd(&next_modified_d[0],1);//c
-        //         }
-        //     }
-        // }
-        __syncthreads();
-        __threadfence();
     }
 
     __device__
@@ -327,54 +375,11 @@ namespace tjnsssp{
                 // int new_dist = is_edata_d[i] + deltas_d[cur_modified_node];//权重图
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                 if(new_dist < deltas_d[dist_node]){
-                    atomicAdd(&next_modified_size_d[index], 1);
-                    atomicAdd(&next_modified_allsize_d, 1);
-                }
-            }
-            __syncthreads();
-            __threadfence();
-            unsigned int cur_pos = 0;
-            unsigned int offset = 0;
-            for(int i=0;i<index;i++){
-                offset += next_modified_size_d[i];
-            }
-            __syncthreads();
-            __threadfence();
-            for(unsigned int i = cur_isoff_d[cur_modified_node]; i < size_is_d[cur_modified_node] + cur_isoff_d[cur_modified_node]; i++){
-                unsigned int dist_node = isoffset_d[i];
-                // int new_dist = is_edata_d[i] + deltas_d[cur_modified_node];//权重图
-                int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
-                if(new_dist < deltas_d[dist_node]){
                     atomicMin(&deltas_d[dist_node], new_dist);
-                    atomicExch(&next_modified_d[offset + cur_pos], dist_node);
-                    cur_pos++;
-                    
+                    atomicExch(&is_modified_d[dist_node], 1);
                 }
             }
-            __syncthreads();
-            __threadfence();
         }
-        /**
-         *  以下写法是错误的
-         * 假如有3个线程,执行完a代码行之后同时执行b代码行,那么相当于对全局内存依次修改(原子操作),全部执行b操作之后再执行c
-         * 而c行的目的是执行完b之后马上执行自增,这显然是不能办到的
-        */
-        // if(values_d[cur_modified_node] > deltas_d[cur_modified_node]){
-        //     // values_d[cur_modified_node] = deltas_d[cur_modified_node];
-        //     atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
-        //     for(unsigned int i = cur_oeoff_d[cur_modified_node]; i < size_oe_d[cur_modified_node] + cur_oeoff_d[cur_modified_node]; i++){
-        //         unsigned int dist_node = oeoffset_d[i];
-        //         // int new_dist = oe_edata_d[i] + deltas_d[cur_modified_node];//权重图
-        //         int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
-        //         if(new_dist < deltas_d[dist_node]){
-        //             atomicMin(&deltas_d[dist_node], new_dist);//a
-        //             atomicExch(&next_modified_d[0], dist_node);//b
-        //             atomicAdd(&next_modified_d[0],1);//c
-        //         }
-        //     }
-        // }
-        __syncthreads();
-        __threadfence();
     }
 
     __device__
@@ -392,34 +397,10 @@ namespace tjnsssp{
                 // int new_dist = ib_edata_d[i] + deltas_d[cur_modified_node];//权重图
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                 if(new_dist < deltas_d[dist_node]){
-                    atomicAdd(&next_modified_size_d[index], 1);
-                    atomicAdd(&next_modified_allsize_d, 1);
-                }
-            }
-            __syncthreads();
-            __threadfence();
-            unsigned int cur_pos = 0;
-            unsigned int offset = 0;
-            for(int i=0;i<index;i++){
-                offset += next_modified_size_d[i];
-            }
-            __syncthreads();
-            __threadfence();
-            for(unsigned int i = cur_iboff_d[cur_modified_node]; i < size_ib_d[cur_modified_node] + cur_iboff_d[cur_modified_node]; i++){
-                unsigned int dist_node = iboffset_d[i];
-                // int new_dist = ib_edata_d[i] + deltas_d[cur_modified_node];//权重图
-                int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
-                if(new_dist < deltas_d[dist_node]){
                     atomicMin(&deltas_d[dist_node], new_dist);
-                    atomicExch(&next_modified_d[offset + cur_pos], dist_node);
-                    cur_pos++;
-                    
+                    atomicExch(&is_modified_d[dist_node], 1);
                 }
             }
-            atomicExch(&next_modified_size_d[index], 0);
-            unsigned int allstart = next_modified_allsize_d;
-            __syncthreads();
-            __threadfence();
             //第二阶段
             for(unsigned int i = cur_isoff_d[cur_modified_node]; i < size_is_d[cur_modified_node] + cur_isoff_d[cur_modified_node]; i++){
                 unsigned int dist_node = isoffset_d[i];
@@ -429,34 +410,11 @@ namespace tjnsssp{
                 // int new_dist = ib_edata_d[i] + deltas_d[cur_modified_node];//权重图
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                 if(new_dist < deltas_d[dist_node]){
-                    atomicAdd(&next_modified_size_d[index], 1);
-                    atomicAdd(&next_modified_allsize_d, 1);
-                }
-            }
-            __syncthreads();
-            __threadfence();
-            offset = 0;
-            cur_pos = 0;
-            for(int i=0;i<index;i++){
-                offset += next_modified_size_d[i];
-            }
-            __syncthreads();
-            __threadfence();
-            for(unsigned int i = cur_isoff_d[cur_modified_node]; i < size_is_d[cur_modified_node] + cur_isoff_d[cur_modified_node]; i++){
-                unsigned int dist_node = isoffset_d[i];
-                // int new_dist = is_edata_d[i] + deltas_d[cur_modified_node];//权重图
-                int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
-                if(new_dist < deltas_d[dist_node]){
                     atomicMin(&deltas_d[dist_node], new_dist);
-                    atomicExch(&next_modified_d[allstart + offset + cur_pos], dist_node);
-                    cur_pos++;
+                    atomicExch(&is_modified_d[dist_node], 1);
                 }
             }
-            __syncthreads();
-            __threadfence();
         }
-        __syncthreads();
-        __threadfence();
     }
 
 }

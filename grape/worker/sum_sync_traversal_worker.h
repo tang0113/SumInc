@@ -779,6 +779,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
     vid_t *cur_modified_d, *next_modified_d;
     vid_t *cur_modified_size_d, *next_modified_size_d;
     vid_t *cur_modified_size_h = (vid_t *)malloc(sizeof(vid_t) * 1);
+    vid_t *is_modified_d;//判断当前顶点是否被修改
 
     unsigned int oe_offsize = 0;//临时变量
     for(int i = 0;i < num; i++){//Ingress
@@ -859,6 +860,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
     cudaMalloc(&cur_modified_size_d, sizeof(vid_t) * 1);
     //下一次每个顶点要加入修改的目的顶点数量,设置为num目的是使用GPU时防止多个线程对全局变量同时进行修改
     cudaMalloc(&next_modified_size_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num));
+    cudaMalloc(&is_modified_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num));
     check();
 
     unsigned int oe_curIndex = 0, ib_curIndex = 0, is_curIndex = 0;
@@ -944,7 +946,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
     }
     LOG(INFO) << "source is "<<sssp_source;
     tjnsssp::init(oeoffset_d, oe_edata_d, cur_oeoff_d, deltas_d, values_d, size_oe_d, sssp_source, 
-                  cur_modified_d, next_modified_d, cur_modified_size_d, next_modified_size_d, 
+                  cur_modified_d, cur_modified_size_d, is_modified_d, (FLAGS_compress ? cpr_->all_node_num : num),
                   iboffset_d, ib_edata_d, cur_iboff_d, size_ib_d, 
                   isoffset_d, is_edata_d, cur_isoff_d, size_is_d, 
                   node_type_d);
@@ -1004,7 +1006,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
           if(FLAGS_gpu_start){
             cudaMemcpy(cur_modified_size_h, cur_modified_size_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
             // check();
-            tjnsssp::g_function(cur_modified_size_h);
+            tjnsssp::g_function(cur_modified_size_h, num);
             // check();
             cudaMemcpy(cur_modified_size_h, cur_modified_size_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
           }
@@ -1051,7 +1053,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
           }
           if(FLAGS_gpu_start){
             cudaMemcpy(cur_modified_size_h, cur_modified_size_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
-            tjnsssp::g_function_compr(cur_modified_size_h);
+            tjnsssp::g_function_compr(cur_modified_size_h, cpr_->all_node_num);
           }
           
         }
