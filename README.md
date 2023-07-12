@@ -125,3 +125,6 @@ The latest version of online documentation can be found at [https://alibaba.gith
 - Submit contributions using pull requests.
 
 Thank you in advance for your contributions!
+
+## reference
+原子锁的实现：https://zhuanlan.zhihu.com/p/418985780?utm_id=0
