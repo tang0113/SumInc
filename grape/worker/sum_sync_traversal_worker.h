@@ -872,8 +872,10 @@ class SumSyncTraversalWorker : public ParallelEngine {
       //根据压缩或者不压缩进行不同的初始化
       if(FLAGS_compress){
         for(int i = 0,k = 0; i < num; i++,k++){
-          if(k < num)//启用压缩时node_type才有效
+          if(k < num){//启用压缩时node_type才有效
             node_type_h[k] = node_type[k];
+          }
+            
           if(k < num){
             for(int j = 0;j < size_oe_h[k]; j++){
               value_t* temp = reinterpret_cast<value_t*>(&oeoffset[i][j].data);//强制转换,原类型为empty不能直接用
@@ -926,6 +928,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
       cudaMemcpy(size_oe_d, size_oe_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
       cudaMemcpy(size_ib_d, size_ib_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
       cudaMemcpy(size_is_d, size_is_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+      cudaMemcpy(node_type_d, node_type_h, sizeof(char) * num, cudaMemcpyHostToDevice);
       check();
       if(FLAGS_gpu_start && FLAGS_compress){//SumInc
 
@@ -1395,7 +1398,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
       vid_t *cur_modified_size_d;
       vid_t *cur_modified_size_h = (vid_t *)malloc(sizeof(vid_t) * 1);
       vid_t *is_modified_d;//判断当前顶点是否被修改
-      vid_t *last_modified_d;
+      int *last_modified_d;
 
       unsigned int ib_offsize = 0;
       for(int i = 0;i < num;i++){//SumInc
@@ -1546,7 +1549,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
       cudaMalloc(&cur_modified_size_d, sizeof(vid_t) * 1);
       //下一次每个顶点要加入修改的目的顶点数量,设置为num目的是使用GPU时防止多个线程对全局变量同时进行修改
       cudaMalloc(&is_modified_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num));
-      cudaMalloc(&last_modified_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num));
+      cudaMalloc(&last_modified_d, sizeof(int) * (FLAGS_compress ? cpr_->all_node_num : num));
       check();
 
       for(int i=0;i<FLAGS_seg_num;i++){
@@ -1609,7 +1612,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
           }
         }
       }
-      for(int i=0;i<10;i++){
+      for(int i=8;i<10;i++){
         for(int j = 0;j < size_ib_h[i];j++){
           
           LOG(INFO)<<ib_e_offset_[i][j].neighbor.GetValue();
@@ -1619,6 +1622,10 @@ class SumSyncTraversalWorker : public ParallelEngine {
       deltas.fake2buffer();
       for(int i=0;i<num;i++){
           deltas_h[i] = deltas.data_buffer[i].value;
+      }
+
+      for(int i = 0; i < num; i++){
+        node_type_h[i] = node_type[i];
       }
 
       cudaMemcpy(cur_iboff_d, cur_iboff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
@@ -1647,6 +1654,15 @@ class SumSyncTraversalWorker : public ParallelEngine {
 
       vid_t *ib_seg_start_d, *ib_seg_end_d, *ib_seg_end_edges_d;
       vid_t *is_seg_start_d, *is_seg_end_d, *is_seg_end_edges_d;
+      vid_t *cur_seg_d, *seg_num_d;
+      vid_t *ib_average_edges_d, *is_average_edges_d;
+
+      vid_t *ib_average_edges_h = (vid_t *)malloc(sizeof(vid_t) * 1);
+      vid_t *is_average_edges_h = (vid_t *)malloc(sizeof(vid_t) * 1);
+      vid_t *seg_num_h = (vid_t *)malloc(sizeof(vid_t) * 1);
+      ib_average_edges_h[0] = ib_average_edges;
+      is_average_edges_h[0] = is_average_edges;
+      seg_num_h[0] = FLAGS_seg_num;
       
       cudaMalloc(&ib_seg_start_d,sizeof(vid_t)*FLAGS_seg_num);
       cudaMalloc(&ib_seg_end_d,sizeof(vid_t)*FLAGS_seg_num);
@@ -1656,6 +1672,12 @@ class SumSyncTraversalWorker : public ParallelEngine {
       cudaMalloc(&is_seg_end_d,sizeof(vid_t)*FLAGS_seg_num);
       cudaMalloc(&is_seg_end_edges_d,sizeof(vid_t)*FLAGS_seg_num);
 
+      cudaMalloc(&cur_seg_d,sizeof(vid_t)*1);
+      cudaMalloc(&seg_num_d,sizeof(vid_t)*1);
+
+      cudaMalloc(&ib_average_edges_d,sizeof(vid_t)*1);
+      cudaMalloc(&is_average_edges_d,sizeof(vid_t)*1);
+
       cudaMemcpy(ib_seg_start_d, ib_seg_start, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
       cudaMemcpy(ib_seg_end_d, ib_seg_end, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
       cudaMemcpy(ib_seg_end_edges_d, ib_seg_end_edges, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
@@ -1663,14 +1685,19 @@ class SumSyncTraversalWorker : public ParallelEngine {
       cudaMemcpy(is_seg_start_d, is_seg_start, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
       cudaMemcpy(is_seg_end_d, is_seg_end, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
       cudaMemcpy(is_seg_end_edges_d, is_seg_end_edges, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
+
+      cudaMemcpy(seg_num_d, seg_num_h, sizeof(vid_t) * 1, cudaMemcpyHostToDevice);
+      cudaMemcpy(ib_average_edges_d, ib_average_edges_h, sizeof(vid_t) * 1, cudaMemcpyHostToDevice);
+      cudaMemcpy(is_average_edges_d, is_average_edges_h, sizeof(vid_t) * 1, cudaMemcpyHostToDevice);
+      cudaMemcpy(node_type_d, node_type_h, sizeof(char) * num, cudaMemcpyHostToDevice);
     
       tjnsssp_seg::init(deltas_d, values_d, sssp_source, 
                       cur_modified_size_d, is_modified_d, last_modified_d, (FLAGS_compress ? cpr_->all_node_num : num),
                       iboffset_d, ib_edata_d, cur_iboff_d, size_ib_d, 
                       isoffset_d, is_edata_d, cur_isoff_d, size_is_d, 
-                      node_type_d, 
-                      ib_seg_start_d, ib_seg_end_d, ib_seg_end_edges_d, 
-                      is_seg_start_d, is_seg_end_d, is_seg_end_edges_d);
+                      node_type_d, cur_seg_d, seg_num_d, 
+                      ib_seg_start_d, ib_seg_end_d, ib_seg_end_edges_d, ib_average_edges_d, 
+                      is_seg_start_d, is_seg_end_d, is_seg_end_edges_d, is_average_edges_d);
       
       double whileTime = 0;
       whileTime = GetCurrentTime();
@@ -1723,11 +1750,12 @@ class SumSyncTraversalWorker : public ParallelEngine {
             if(FLAGS_gpu_start){
               cudaMemcpy(iboffset_d, iboffset_h[cur_seg], sizeof(vid_t) * ib_average_edges, cudaMemcpyHostToDevice);
               cudaMemcpy(isoffset_d, isoffset_h[cur_seg], sizeof(vid_t) * is_average_edges, cudaMemcpyHostToDevice);
-              cudaMemcpy(ib_edata_d, ib_edata_h[cur_seg], sizeof(vid_t) * ib_average_edges, cudaMemcpyHostToDevice);
-              cudaMemcpy(is_edata_d, is_edata_h[cur_seg], sizeof(vid_t) * is_average_edges, cudaMemcpyHostToDevice);
+              // cudaMemcpy(ib_edata_d, ib_edata_h[cur_seg], sizeof(vid_t) * ib_average_edges, cudaMemcpyHostToDevice);
+              // cudaMemcpy(is_edata_d, is_edata_h[cur_seg], sizeof(vid_t) * is_average_edges, cudaMemcpyHostToDevice);
 
-              // tjnsssp_seg::g_function_compr(cur_modified_size_h, cpr_->all_node_num);
+              tjnsssp_seg::g_function_compr(cpr_->all_node_num);
               cudaMemcpy(cur_modified_size_h, cur_modified_size_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
+              LOG(INFO) << "cur size is "<<cur_modified_size_h[0];
               cur_seg++;
             }
             
@@ -1760,7 +1788,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
 
         exec_time += GetCurrentTime();
         bool terminate = messages_.ToTerminate();
-        if ( (terminate && !FLAGS_gpu_start) || (!cur_modified_size_h[0] && FLAGS_gpu_start) || step > 100 * FLAGS_seg_num) {
+        if ( (terminate && !FLAGS_gpu_start) || (!cur_modified_size_h[0] && FLAGS_gpu_start) || step > 100 * FLAGS_seg_num ) {
             if(compr_stage){
             LOG(INFO) << "start correct...";
             // check_result("correct before");

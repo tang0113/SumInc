@@ -149,7 +149,7 @@ namespace tjnsssp{
 
     __global__
     void g_function_compr_real(){
-
+        
         int index = threadIdx.x + blockIdx.x * blockDim.x;
         if(index < num){
             if(last_modified_d[index] == 0){
@@ -159,18 +159,22 @@ namespace tjnsssp{
                     case 0:
                         {
                             sssp_nodeTypeZeroAndOne(index);
+                            break;
                         }
                     case 1:
                         {
                             sssp_nodeTypeZeroAndOne(index);
+                            break;
                         }
                     case 2:
                         {
                             sssp_nodeTypeTwo(index);
+                            break;
                         }
                     case 3:
                         {
                             sssp_nodeTypeThree(index);
+                            break;
                         }
                 }
             }
@@ -264,15 +268,15 @@ namespace tjnsssp{
             cur_modified_size_d[0] = 0;
             int maxid = 0;
             int maxvalue = 0;
-            // for(int i=0;i<58655849;i++){
-            //     if(values_d[i] !=  2147483647 && values_d[i] > maxvalue){
-            //         maxvalue = values_d[i];
-            //         maxid = i;
-            //     }
-            //     if(i == 266023 || i == 266024){
-            //         printf("values is %d",values_d[i]);
-            //     }
-            // }
+            for(int i=0;i<num;i++){
+                if(values_d[i] !=  2147483647 && values_d[i] > maxvalue){
+                    maxvalue = values_d[i];
+                    maxid = i;
+                }
+                // if(i == 266023 || i == 266024){
+                //     printf("values is %d",values_d[i]);
+                // }
+            }
             printf("max values[%d] is %d",maxid,values_d[maxid]);
             printf("-------------------------------end-------------------------------");
         }
