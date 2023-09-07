@@ -19,6 +19,8 @@ namespace tjnsssp{
     __device__ int *oe_edata_d;
     __device__ int *ib_edata_d;
     __device__ int *is_edata_d;
+    __device__ unsigned int *is_eparent_d;
+    __device__ unsigned int *deltas_parent_d;
 
     __device__ int *deltas_d;
     __device__ int *values_d;
@@ -40,7 +42,7 @@ namespace tjnsssp{
     void init(unsigned int *oeoffset_d, int *oe_edata_d, unsigned int *cur_oeoff_d, int *deltas_d, int *values_d, unsigned int *size_oe_d, int FLAGS_sssp_source, 
               unsigned int *cur_modified_size_d, unsigned int *is_modified_d, unsigned int *last_modified_d, unsigned int num, 
               unsigned int *iboffset_d, int *ib_edata_d, unsigned int *cur_iboff_d, unsigned int *size_ib_d, 
-              unsigned int *isoffset_d, int *is_edata_d, unsigned int *cur_isoff_d, unsigned int *size_is_d, 
+              unsigned int *isoffset_d, int *is_edata_d, unsigned int *cur_isoff_d, unsigned int *size_is_d, unsigned int *is_eparent_d, unsigned int *deltas_parent_d, 
               char *node_type_d){
 
                 // int *sem_d;
@@ -49,7 +51,7 @@ namespace tjnsssp{
         init_real<<<1,1>>>(oeoffset_d, oe_edata_d, cur_oeoff_d, deltas_d, values_d, size_oe_d, FLAGS_sssp_source, 
                            cur_modified_size_d, is_modified_d, last_modified_d, num, 
                            iboffset_d, ib_edata_d, cur_iboff_d, size_ib_d, 
-                           isoffset_d, is_edata_d, cur_isoff_d, size_is_d, 
+                           isoffset_d, is_edata_d, cur_isoff_d, size_is_d, is_eparent_d, deltas_parent_d, 
                            node_type_d);
 
     }
@@ -58,12 +60,14 @@ namespace tjnsssp{
     void init_real(unsigned int *oeoffset_d, int *oe_edata_d, unsigned int *cur_oeoff_d, int *deltas_d, int *values_d, unsigned int *size_oe_d, int FLAGS_sssp_source, 
               unsigned int *cur_modified_size_d, unsigned int *is_modified_d, unsigned int *last_modified_d, unsigned int num, 
               unsigned int *iboffset_d, int *ib_edata_d, unsigned int *cur_iboff_d, unsigned int *size_ib_d, 
-              unsigned int *isoffset_d, int *is_edata_d, unsigned int *cur_isoff_d, unsigned int *size_is_d, 
+              unsigned int *isoffset_d, int *is_edata_d, unsigned int *cur_isoff_d, unsigned int *size_is_d, unsigned int *is_eparent_d, unsigned int *deltas_parent_d, 
               char *node_type_d){
 
         tjnsssp::oeoffset_d = oeoffset_d;
         tjnsssp::iboffset_d = iboffset_d;
         tjnsssp::isoffset_d = isoffset_d;
+        tjnsssp::is_eparent_d = is_eparent_d;
+        tjnsssp::deltas_parent_d = deltas_parent_d;
 
         tjnsssp::cur_oeoff_d = cur_oeoff_d;
         tjnsssp::cur_iboff_d = cur_iboff_d;
@@ -383,6 +387,8 @@ namespace tjnsssp{
                 if(new_dist < deltas_d[dist_node]){
                     atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&is_modified_d[dist_node], 1);
+                    unsigned int e_parent = cur_modified_node;
+                    atomicExch(&deltas_parent_d[dist_node], e_parent);
                 }
             }
         }
@@ -404,6 +410,8 @@ namespace tjnsssp{
                 if(new_dist < deltas_d[dist_node]){
                     atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&is_modified_d[dist_node], 1);
+                    unsigned int e_parent = is_eparent_d[i];
+                    atomicExch(&deltas_parent_d[dist_node], e_parent);
                 }
             }
         }
@@ -426,6 +434,8 @@ namespace tjnsssp{
                 if(new_dist < deltas_d[dist_node]){
                     atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&is_modified_d[dist_node], 1);
+                    unsigned int e_parent = cur_modified_node;
+                    atomicExch(&deltas_parent_d[dist_node], e_parent);
                 }
             }
             //第二阶段
@@ -439,6 +449,8 @@ namespace tjnsssp{
                 if(new_dist < deltas_d[dist_node]){
                     atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&is_modified_d[dist_node], 1);
+                    unsigned int e_parent = is_eparent_d[i];
+                    atomicExch(&deltas_parent_d[dist_node], e_parent);
                 }
             }
         }

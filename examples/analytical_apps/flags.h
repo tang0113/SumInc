@@ -61,5 +61,7 @@ DECLARE_int32(compress_type);
 DECLARE_string(message_type);
 DECLARE_double(compress_threshold);
 DECLARE_bool(gpu_start);
+DECLARE_bool(segment);//是否分段 
+DECLARE_int32(seg_num);//分段数量
 
 #endif  // EXAMPLES_ANALYTICAL_APPS_FLAGS_H_

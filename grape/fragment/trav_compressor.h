@@ -733,6 +733,7 @@ class TravCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
               values[mid] = this->app_->GetInitValue(u); // reset using master
               if (is_update) {
                 this->app_->curr_modified_.Insert(u);
+                // LOG(INFO) << "u value is "<<u.GetValue();
               }
             }
           }
@@ -741,6 +742,7 @@ class TravCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
           for (auto u : node_set) {
             if (this->supernode_out_bound[u.GetValue()]) {
               this->app_->curr_modified_.Insert(u);
+            //   LOG(INFO) << "u value is "<<u.GetValue();
             }
           }
         }
@@ -858,6 +860,7 @@ class TravCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
         // Output(new_graph);
         while (true) {
             step++;
+            // LOG(INFO) << "step is "<<step;
             curr_modified_.clear();
             // receive & send
             for(auto v : next_modified_){

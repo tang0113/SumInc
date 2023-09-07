@@ -66,3 +66,5 @@ DEFINE_int32(compress_type, 0, "0:mode2, 1:use metis, 2:scan++");
 DEFINE_string(message_type, "push", "push, pull");
 DEFINE_double(compress_threshold, 1, "threshold for compression");
 DEFINE_bool(gpu_start, false, "gpu_start");
+DEFINE_bool(segment, false, "use segment");
+DEFINE_int32(seg_num, 0, "seg num");

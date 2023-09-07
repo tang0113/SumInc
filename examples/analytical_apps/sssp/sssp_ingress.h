@@ -72,12 +72,14 @@ class SSSPIngress : public TraversalAppBase<FRAG_T, VALUE_T> {
       granular_for(j, 0, out_degree, (out_degree > 1024), {
         auto& e = *(it + j);
         auto v = e.neighbor;
-        auto new_dist = e.data + dist;
+        // auto new_dist = e.data + dist;//权重图
+        auto new_dist = 1 + dist;//无权测试
         // LOG(INFO) << "vid:" << u.GetValue()
         //           << " ->" << v.GetValue()
         //           << " w=" << delta.value;
         if (this->deltas_[v].value > new_dist) {
           delta_t delta_to_send = this->GenDelta(u, new_dist);
+          
           this->AccumulateToAtomic(v, delta_to_send);
           modified.Insert(v);
           // this->touch_nodes.Insert(v);
@@ -137,12 +139,15 @@ class SSSPIngress : public TraversalAppBase<FRAG_T, VALUE_T> {
       granular_for(j, 0, out_degree, (out_degree > 1024), {
         auto& e = *(it + j);
         auto v = e.neighbor;
-        auto new_dist = e.data + dist;
+        // auto new_dist = e.data + dist;//权重图
+        auto new_dist = 1 + dist;//无权测试
         // LOG(INFO) << "vid:" << u.GetValue()
         //           << " ->" << v.GetValue()
         //           << " w=" << delta.value;
         if (this->deltas_[v].value > new_dist) {
           delta_t delta_to_send = this->GenDelta(u, new_dist);
+          // LOG(INFO) << "u si "<< u.GetValue();
+          // LOG(INFO) << "parent is "<<this->fragment().Vertex2Gid(u);
           this->AccumulateToAtomic(v, delta_to_send);
           modified.Insert(v);
           // this->touch_nodes.Insert(v);
@@ -219,12 +224,16 @@ class SSSPIngress : public TraversalAppBase<FRAG_T, VALUE_T> {
       granular_for(j, 0, out_degree, (out_degree > 1024), {
         auto& e = *(it + j);
         auto v = e.neighbor;
-        auto new_dist = e.data.value + dist;
+        // auto new_dist = e.data.value + dist;//权重图
+        auto new_dist = 1 + dist;//无权测试
         // LOG(INFO) << "vid:" << v.GetValue()
         //           << " ->" << e.neighbor.GetValue()
         //           << " w=" << delta.value;
         if (this->deltas_[v].value > new_dist) { 
           delta_t delta_to_send = this->GenDelta(e.data.parent_gid, new_dist);
+          // LOG(INFO) << "u is "<<u.GetValue();
+          // LOG(INFO) << "gid isa "<<this->fragment().GetId(u);
+          // LOG(INFO) << "parent is "<< e.data.parent_gid;
           this->AccumulateToAtomic(v, delta_to_send);
           modified.Insert(v);
           // this->touch_nodes.Insert(v);
