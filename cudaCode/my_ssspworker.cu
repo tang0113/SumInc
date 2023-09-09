@@ -93,7 +93,7 @@ namespace tjnsssp{
         tjnsssp::num = num;
         tjnsssp::is_modified_d = is_modified_d;
         tjnsssp::last_modified_d = last_modified_d;
-        tjnsssp::last_modified_d[FLAGS_sssp_source] = 1;
+        // tjnsssp::last_modified_d[FLAGS_sssp_source] = 1;
 
         tjnsssp::node_type_d = node_type_d;
         
@@ -268,22 +268,22 @@ namespace tjnsssp{
         //     }
         //     cur_modified_size_d[0] = next_modified_allsize_d;
         // }
-        if(next_modified_allsize_d == 0 && index == 0){
-            cur_modified_size_d[0] = 0;
-            int maxid = 0;
-            int maxvalue = 0;
-            for(int i=0;i<num;i++){
-                if(values_d[i] !=  2147483647 && values_d[i] > maxvalue){
-                    maxvalue = values_d[i];
-                    maxid = i;
-                }
-                // if(i == 266023 || i == 266024){
-                //     printf("values is %d",values_d[i]);
-                // }
-            }
-            printf("max values[%d] is %d",maxid,values_d[maxid]);
-            printf("-------------------------------end-------------------------------");
-        }
+        // if(next_modified_allsize_d == 0 && index == 0){
+        //     cur_modified_size_d[0] = 0;
+        //     int maxid = 0;
+        //     int maxvalue = 0;
+        //     for(int i=0;i<num;i++){
+        //         if(values_d[i] !=  2147483647 && values_d[i] > maxvalue){
+        //             maxvalue = values_d[i];
+        //             maxid = i;
+        //         }
+        //         // if(i == 266023 || i == 266024){
+        //         //     printf("values is %d",values_d[i]);
+        //         // }
+        //     }
+        //     printf("max values[%d] is %d",maxid,values_d[maxid]);
+        //     printf("-------------------------------end-------------------------------");
+        // }
     }
 
     void clear(unsigned int num){

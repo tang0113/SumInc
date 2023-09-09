@@ -704,6 +704,7 @@ class TravCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
       auto& deltas = this->app_->deltas_;
       auto& values = this->app_->values_;
       size_t active_cluster_num = this->active_clusters.size();
+      double runTime = GetCurrentTime();
       parallel_for(vid_t i = 0; i < active_cluster_num; i++) {
         if (this->active_clusters[i] == 1) {
           vid_t spids = i;
@@ -714,9 +715,13 @@ class TravCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
             deltas[m] = this->app_->GetInitDelta(v); // 注意，需要再次修改delta/values的大小，因为新图的没有包括Mirror点
             values[m] = this->app_->GetInitValue(v); // reinit里面初始化了,这个应该可以不用初始化
           }
+        //   runTime = GetCurrentTime();
           run_to_convergence_for_precpt(spids, new_graph);
+        //   runTime = GetCurrentTime() - runTime;
         }
       }
+      runTime = GetCurrentTime() - runTime;
+      LOG(INFO) << "run time is "<<runTime;
       // get active node from out_mirror /
       parallel_for(vid_t i = 0; i < active_cluster_num; i++) {
         if (this->active_clusters[i] == 1) {

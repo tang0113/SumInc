@@ -781,6 +781,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
       // vid_t *cur_modified_d, *next_modified_d;
       vid_t *cur_modified_size_d;
       vid_t *cur_modified_size_h = (vid_t *)malloc(sizeof(vid_t) * 1);
+      vid_t *last_modified_h = (vid_t *)malloc(sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num));
       vid_t *is_modified_d;//判断当前顶点是否被修改
       vid_t *last_modified_d;
 
@@ -842,7 +843,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
       // LOG(INFO) << "delta size is "<<deltas.size();
       // LOG(INFO) << "valuesize is "<<values.size();
       // LOG(INFO) << "is size is "<<is_offsize;
-      LOG(INFO) << "ibe is "<<ib_e_.size();
+      LOG(INFO) << "is is "<<is_e_.size();
       LOG(INFO) << "ib off is"<<ib_e_offset_.size();
       LOG(INFO) << "ib offsize is "<<ib_offsize;
       LOG(INFO) << "oe offsize is "<<oe_offsize;
@@ -963,8 +964,9 @@ class SumSyncTraversalWorker : public ParallelEngine {
           // vertex_t v(sssp_source-i);
           vertex_t temp(i);
           if(app_->curr_modified_.Exist(temp)){
-            LOG(INFO) << "sssp source is "<< temp.GetValue();
-            sssp_source = i;
+            // LOG(INFO) << "sssp source is "<< temp.GetValue();
+            // sssp_source = i;
+            last_modified_h[i] = 1;
             break;
           }
           // if(app_->curr_modified_.Exist(v)){
@@ -977,6 +979,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
           // }
         }
       }
+      cudaMemcpy(last_modified_d, last_modified_h, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
       LOG(INFO) << "source is "<<sssp_source;
       tjnsssp::init(oeoffset_d, oe_edata_d, cur_oeoff_d, deltas_d, values_d, size_oe_d, sssp_source, 
                     cur_modified_size_d, is_modified_d, last_modified_d, (FLAGS_compress ? cpr_->all_node_num : num),
@@ -985,13 +988,8 @@ class SumSyncTraversalWorker : public ParallelEngine {
                     node_type_d);
                     check();
       check();
-
-      double whileTime = 0;
-      whileTime = GetCurrentTime();
-      double updateTime = GetCurrentTime();
-      //测试
-      vid_t *last_modified_h = (vid_t *)malloc(sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num));
-
+      
+      double updatetime = 0;
       while (true) {
         LOG(INFO) << "step=" << step << " curr_modified_.size()=" << app_->curr_modified_.Count();
         exec_time -= GetCurrentTime();
@@ -1190,32 +1188,32 @@ class SumSyncTraversalWorker : public ParallelEngine {
           }
         }
         // for_time += GetCurrentTime();
-        if(FLAGS_gpu_start){
-          deltas.fake2buffer();
-          values.fake2buffer();
-          cudaMemcpy(deltas_h, deltas_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
-          cudaMemcpy(deltas_parent_h, deltas_parent_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
-          cudaMemcpy(values.data_buffer, values_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
-          check();
+        // if(FLAGS_gpu_start){
+        //   deltas.fake2buffer();
+        //   values.fake2buffer();
+        //   cudaMemcpy(deltas_h, deltas_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
+        //   cudaMemcpy(deltas_parent_h, deltas_parent_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
+        //   cudaMemcpy(values.data_buffer, values_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
+        //   check();
           
-          for(int i = 0;i < (FLAGS_gpu_start ? cpr_->all_node_num : num);i++){
-            // if(deltas.data_buffer[i].value != deltas_h[i])LOG(INFO) << "no";
-            deltas.data_buffer[i].value = deltas_h[i];
-            deltas.data_buffer[i].parent_gid = deltas_parent_h[i];
-          }
-          deltas.buffer2fake();
-          values.buffer2fake();
-          int temp = 0;
-          cudaMemcpy(last_modified_h, last_modified_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
-          // for(int i=0;i< (FLAGS_compress ? cpr_->all_node_num : num);i++){
-          //   vertex_t v(i);
-          //   if(last_modified_h[i] == 1){
-          //     app_->next_modified_.Insert(v);
-          //     temp++;
-          //   }
-          // }
-          // LOG(INFO) << temp;
-        }
+        //   for(int i = 0;i < (FLAGS_gpu_start ? cpr_->all_node_num : num);i++){
+        //     // if(deltas.data_buffer[i].value != deltas_h[i])LOG(INFO) << "no";
+        //     deltas.data_buffer[i].value = deltas_h[i];
+        //     deltas.data_buffer[i].parent_gid = deltas_parent_h[i];
+        //   }
+        //   deltas.buffer2fake();
+        //   values.buffer2fake();
+        //   // int temp = 0;
+        //   // cudaMemcpy(last_modified_h, last_modified_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
+        //   // for(int i=0;i< (FLAGS_compress ? cpr_->all_node_num : num);i++){
+        //   //   vertex_t v(i);
+        //   //   if(last_modified_h[i] == 1){
+        //   //     app_->next_modified_.Insert(v);
+        //   //     temp++;
+        //   //   }
+        //   // }
+        //   // LOG(INFO) << temp;
+        // }
         
         auto& channels = messages_.Channels();
         // send local delta to remote
@@ -1253,17 +1251,23 @@ class SumSyncTraversalWorker : public ParallelEngine {
 
         bool terminate = messages_.ToTerminate();
         if ( (terminate && !FLAGS_gpu_start) || (!cur_modified_size_h[0] && FLAGS_gpu_start) ) {//if(app_->next_modified_.Count() == 0)
+          if(updatetime != 0){
+            updatetime = GetCurrentTime() -updatetime;
+            LOG(INFO) << "update time is "<< updatetime;
+          }
           if(FLAGS_gpu_start && batch_stage){
-            values.fake2buffer();
-            deltas.fake2buffer();
-            cudaMemcpy(deltas_h, deltas_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
-            cudaMemcpy(values.data_buffer, values_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
-            
-            for(int i = 0;i < (FLAGS_gpu_start ? cpr_->all_node_num : num);i++){
-              deltas.data_buffer[i].value = deltas_h[i];
-            }
-            values.buffer2fake();
-            deltas.buffer2fake();
+              deltas.fake2buffer();
+              values.fake2buffer();
+              cudaMemcpy(deltas_h, deltas_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
+              cudaMemcpy(deltas_parent_h, deltas_parent_d, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
+              cudaMemcpy(values.data_buffer, values_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
+              for(int i = 0;i < (FLAGS_gpu_start ? cpr_->all_node_num : num);i++){
+                // if(deltas.data_buffer[i].value != deltas_h[i])LOG(INFO) << "no";
+                deltas.data_buffer[i].value = deltas_h[i];
+                deltas.data_buffer[i].parent_gid = deltas_parent_h[i];
+              }
+              deltas.buffer2fake();
+              values.buffer2fake();
           }
           if(compr_stage){
             LOG(INFO) << "start correct...";
@@ -1382,10 +1386,150 @@ class SumSyncTraversalWorker : public ParallelEngine {
               // 新版本重排序
               if (compr_stage == true) {
                 // app_->next_modified_.Swap(app_->curr_modified_);
-                first_step(values_temp, deltas_temp, exec_time, true);
+                double tempTime = GetCurrentTime();
+                first_step(values_temp, deltas_temp, exec_time, true); 
+                tempTime = GetCurrentTime() - tempTime;
+                LOG(INFO) << "first time is "<< tempTime;
+                
+                //释放内存并且重新分配，size发生变化的变量需要重新分配
+                free(oeoffset_h);
+                free(iboffset_h);
+                free(isoffset_h);
+                cudaFree(oeoffset_d);
+                cudaFree(iboffset_d);
+                cudaFree(isoffset_d);
+
+                free(oe_edata_h);
+                free(ib_edata_h);
+                free(is_edata_h);
+                cudaFree(oe_edata_d);
+                cudaFree(ib_edata_d);
+                cudaFree(is_edata_d);
+
+                free(is_eparent_h);
+                cudaFree(is_eparent_d);
+
+                //重新分配内存并且传回gpu
+                oeoffset = fragment_->getOeoffset();
+                oe_offsize = 0;
+                for(int i = 0;i < num; i++){//Ingress
+                  cur_oeoff_h[i] = oe_offsize;
+                  oe_offsize += oeoffset[i+1] - oeoffset[i];
+                  size_oe_h[i] = oeoffset[i+1] - oeoffset[i];
+                }
+
+                ib_offsize = 0;
+                if(compr_stage){
+                  for(int i = 0;i < num;i++){//SumInc
+                    cur_iboff_h[i] = ib_offsize;
+                    ib_offsize += ib_e_offset_[i+1] - ib_e_offset_[i];
+                    size_ib_h[i] = ib_e_offset_[i+1] - ib_e_offset_[i];
+                  }
+                }
+
+                is_offsize = 0;
+                if(compr_stage){
+                  for(int i=0;i < num;i++){
+                    cur_isoff_h[i] = is_offsize;
+                    is_offsize += is_e_offset_[i+1] - is_e_offset_[i];
+                    size_is_h[i] = is_e_offset_[i+1] - is_e_offset_[i];
+                  }
+                }
+
+                oeoffset_h = (vid_t *)malloc(sizeof(vid_t) * oe_offsize);
+                iboffset_h = (vid_t *)malloc(sizeof(vid_t) * ib_offsize);
+                isoffset_h = (vid_t *)malloc(sizeof(vid_t) * is_offsize);
+                cudaMalloc(&oeoffset_d, sizeof(vid_t) * oe_offsize);
+                cudaMalloc(&iboffset_d, sizeof(vid_t) * ib_offsize);
+                cudaMalloc(&isoffset_d, sizeof(vid_t) * is_offsize);
+                
+                oe_edata_h = (value_t *)malloc(sizeof(value_t) * oe_offsize);
+                ib_edata_h = (value_t *)malloc(sizeof(value_t) * ib_offsize);
+                is_edata_h = (value_t *)malloc(sizeof(value_t) * is_offsize);
+                cudaMalloc(&oe_edata_d, sizeof(value_t) * oe_offsize);
+                cudaMalloc(&ib_edata_d, sizeof(value_t) * ib_offsize);
+                cudaMalloc(&is_edata_d, sizeof(value_t) * is_offsize);
+
+                is_eparent_h = (vid_t *)malloc(sizeof(vid_t) * is_offsize);
+                cudaMalloc(&is_eparent_d, sizeof(vid_t) * is_offsize);
+
+                oe_curIndex = ib_curIndex = is_curIndex = 0;
+
+                if(FLAGS_compress){
+                  for(int i=0;i<num;i++){
+                    node_type_h[i] = node_type[i];
+                    for(int j = 0;j < size_oe_h[i]; j++){
+                      value_t* temp = reinterpret_cast<value_t*>(&oeoffset[i][j].data);//强制转换,原类型为empty不能直接用
+                      oe_edata_h[oe_curIndex] = *temp;
+                      oeoffset_h[oe_curIndex++] = oeoffset[i][j].neighbor.GetValue();
+                    }
+                    for(int j = 0;j < size_is_h[i]; j++){
+                      is_edata_h[is_curIndex] = is_e_offset_[i][j].data.value;
+                      is_eparent_h[is_curIndex] = is_e_offset_[i][j].data.parent_gid;
+                      isoffset_h[is_curIndex++] = is_e_offset_[i][j].neighbor.GetValue();
+                    }
+                    for(int j = 0;j < size_ib_h[i];j++){
+                      value_t* temp = reinterpret_cast<value_t*>(&ib_e_offset_[i][j].data);//强制转换,原类型为empty不能直接用
+                      // value_t x = ib_e_offset_[i][j].data.value;
+                      // ib_edata_h[ib_curIndex] = temp->value;
+                      ib_edata_h[ib_curIndex] = *temp;
+                      iboffset_h[ib_curIndex++] = ib_e_offset_[i][j].neighbor.GetValue();
+                    }
+                  }
+                }else{
+                  for(int i = 0; i < num; i++){
+                    for(int j = 0;j < size_oe_h[i]; j++){
+                        value_t* temp = reinterpret_cast<value_t*>(&oeoffset[i][j].data);//强制转换,原类型为empty不能直接用
+                        oe_edata_h[oe_curIndex] = *temp;
+                        oeoffset_h[oe_curIndex++] = oeoffset[i][j].neighbor.GetValue();
+                      }
+                  }
+                }
+
+                values.fake2buffer();
+                deltas.fake2buffer();
+                for(int i = 0;i < (FLAGS_compress ? cpr_->all_node_num : num);i++){
+                  deltas_h[i] = deltas.data_buffer[i].value;
+                  deltas_parent_h[i] = deltas.data_buffer[i].parent_gid;
+                  // LOG(INFO) <<"i is "<<i<<"deltas parent" << deltas.data_buffer[i].parent_gid;
+                }
+                cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * oe_offsize, cudaMemcpyHostToDevice);
+                cudaMemcpy(iboffset_d, iboffset_h, sizeof(vid_t) * ib_offsize, cudaMemcpyHostToDevice);
+                cudaMemcpy(isoffset_d, isoffset_h, sizeof(vid_t) * is_offsize, cudaMemcpyHostToDevice);
+
+                cudaMemcpy(oe_edata_d, oe_edata_h, sizeof(value_t) * oe_offsize, cudaMemcpyHostToDevice);
+                cudaMemcpy(ib_edata_d, ib_edata_h, sizeof(value_t) * ib_offsize, cudaMemcpyHostToDevice);
+                cudaMemcpy(is_edata_d, is_edata_h, sizeof(value_t) * is_offsize, cudaMemcpyHostToDevice);
+                cudaMemcpy(is_eparent_d, is_eparent_h, sizeof(vid_t) * is_offsize, cudaMemcpyHostToDevice);
+
+                cudaMemcpy(cur_oeoff_d, cur_oeoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+                cudaMemcpy(cur_iboff_d, cur_iboff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+                cudaMemcpy(cur_isoff_d, cur_isoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+
+                cudaMemcpy(deltas_d, deltas_h, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
+                cudaMemcpy(deltas_parent_d, deltas_parent_h, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
+                cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
+
+                cudaMemcpy(size_oe_d, size_oe_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+                cudaMemcpy(size_ib_d, size_ib_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+                cudaMemcpy(size_is_d, size_is_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+                cudaMemcpy(node_type_d, node_type_h, sizeof(char) * num, cudaMemcpyHostToDevice);
+                check();
+                for(int i = 0;i<(FLAGS_compress ? cpr_->all_node_num : num);i++){
+                  vertex_t temp(i);
+                  if(app_->curr_modified_.Exist(temp)){
+                    last_modified_h[i] = 1;
+                  }
+                }
+                cudaMemcpy(last_modified_d, last_modified_h, sizeof(vid_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
+                tjnsssp::init(oeoffset_d, oe_edata_d, cur_oeoff_d, deltas_d, values_d, size_oe_d, sssp_source, 
+                              cur_modified_size_d, is_modified_d, last_modified_d, (FLAGS_compress ? cpr_->all_node_num : num),
+                              iboffset_d, ib_edata_d, cur_iboff_d, size_ib_d, 
+                              isoffset_d, is_edata_d, cur_isoff_d, size_is_d, is_eparent_d, deltas_parent_d, 
+                              node_type_d);
               }
               timer_next("inc algorithm");
-              updateTime = GetCurrentTime();
+              updatetime = GetCurrentTime();
               continue; // 已经将活跃点放入curr_modified_中了..
 
             } else {
@@ -1410,14 +1554,8 @@ class SumSyncTraversalWorker : public ParallelEngine {
             break;
           }
         }
-
         app_->next_modified_.Swap(app_->curr_modified_); // 针对Ingress做动态时, 用这个 
       }
-      
-      whileTime = GetCurrentTime() - whileTime;
-      // updateTime = GetCurrentTime() - updateTime;
-      LOG(INFO) << "while time is "<< whileTime;
-      // LOG(INFO) << "update time is "<< updateTime;
       free(size_oe_h);
       free(size_ib_h);
       free(size_is_h);
@@ -1453,8 +1591,6 @@ class SumSyncTraversalWorker : public ParallelEngine {
       cudaFree(size_oe_d);
       cudaFree(size_ib_d);
       cudaFree(size_is_d);
-      updateTime = GetCurrentTime() - updateTime;
-      LOG(INFO) << "update time is "<< updateTime;
     }
     
     if(FLAGS_segment){
@@ -1770,8 +1906,6 @@ class SumSyncTraversalWorker : public ParallelEngine {
                       ib_seg_start_d, ib_seg_end_d, ib_seg_end_edges_d, ib_average_edges_d, 
                       is_seg_start_d, is_seg_end_d, is_seg_end_edges_d, is_average_edges_d);
       
-      double whileTime = 0;
-      whileTime = GetCurrentTime();
       int cur_seg = 0;
       while(true){
         cur_seg = cur_seg % FLAGS_seg_num;
@@ -1970,8 +2104,6 @@ class SumSyncTraversalWorker : public ParallelEngine {
 
         app_->next_modified_.Swap(app_->curr_modified_); // 针对Ingress做动态时, 用这个 
       }
-      whileTime = GetCurrentTime() - whileTime;
-      LOG(INFO) << "while time is "<< whileTime;
     }
     // Analysis result
     double d_sum = 0;
