@@ -6,6 +6,7 @@ namespace tjnsssp_seg{
 
     __device__ unsigned int *iboffset_d;
     __device__ unsigned int *isoffset_d;
+    __device__ unsigned int *is_eparent_d;
 
     __device__ unsigned int *cur_iboff_d;
     __device__ unsigned int *cur_isoff_d;
@@ -17,6 +18,7 @@ namespace tjnsssp_seg{
     __device__ int *is_edata_d;
 
     __device__ int *deltas_d;
+    __device__ unsigned int *deltas_parent_d;
     __device__ int *values_d;
 
     __device__ unsigned int *cur_modified_size_d;//长度为1,只记录当前修改队列的长度
@@ -43,18 +45,18 @@ namespace tjnsssp_seg{
     __device__ unsigned int *is_average_edges_d;
 
 
-    void init(int *deltas_d, int *values_d, int FLAGS_sssp_source, 
+    void init(int *deltas_d, int *values_d, int FLAGS_sssp_source, unsigned int *deltas_parent_d, 
               unsigned int *cur_modified_size_d, unsigned int *is_modified_d, int *last_modified_d, unsigned int num, 
               unsigned int *iboffset_d, int *ib_edata_d, unsigned int *cur_iboff_d, unsigned int *size_ib_d, 
-              unsigned int *isoffset_d, int *is_edata_d, unsigned int *cur_isoff_d, unsigned int *size_is_d, 
+              unsigned int *isoffset_d, int *is_edata_d, unsigned int *cur_isoff_d, unsigned int *size_is_d, unsigned int *is_eparent_d, 
               char *node_type_d, unsigned int *cur_seg_d, unsigned int *seg_num_d, 
               unsigned int *ib_seg_start_d, unsigned int *ib_seg_end_d, unsigned int *ib_seg_end_edges_d, unsigned int *ib_average_edges_d, 
               unsigned int *is_seg_start_d, unsigned int *is_seg_end_d, unsigned int *is_seg_end_edges_d, unsigned int *is_average_edges_d){
 
-        init_real<<<1,1>>>(deltas_d, values_d, FLAGS_sssp_source, 
+        init_real<<<1,1>>>(deltas_d, values_d, FLAGS_sssp_source, deltas_parent_d, 
                    cur_modified_size_d, is_modified_d, last_modified_d, num, 
                    iboffset_d, ib_edata_d, cur_iboff_d, size_ib_d, 
-                   isoffset_d, is_edata_d, cur_isoff_d, size_is_d, 
+                   isoffset_d, is_edata_d, cur_isoff_d, size_is_d, is_eparent_d, 
                    node_type_d, cur_seg_d, seg_num_d, 
                    ib_seg_start_d, ib_seg_end_d, ib_seg_end_edges_d, ib_average_edges_d, 
                    is_seg_start_d, is_seg_end_d, is_seg_end_edges_d, is_average_edges_d);
@@ -62,16 +64,17 @@ namespace tjnsssp_seg{
     }
 
     __global__
-    void init_real(int *deltas_d, int *values_d, int FLAGS_sssp_source, 
+    void init_real(int *deltas_d, int *values_d, int FLAGS_sssp_source, unsigned int *deltas_parent_d, 
               unsigned int *cur_modified_size_d, unsigned int *is_modified_d, int *last_modified_d, unsigned int num, 
               unsigned int *iboffset_d, int *ib_edata_d, unsigned int *cur_iboff_d, unsigned int *size_ib_d, 
-              unsigned int *isoffset_d, int *is_edata_d, unsigned int *cur_isoff_d, unsigned int *size_is_d, 
+              unsigned int *isoffset_d, int *is_edata_d, unsigned int *cur_isoff_d, unsigned int *size_is_d, unsigned int *is_eparent_d,  
               char *node_type_d, unsigned int *cur_seg_d, unsigned int *seg_num_d,
               unsigned int *ib_seg_start_d, unsigned int *ib_seg_end_d, unsigned int *ib_seg_end_edges_d, unsigned int *ib_average_edges_d, 
               unsigned int *is_seg_start_d, unsigned int *is_seg_end_d, unsigned int *is_seg_end_edges_d, unsigned int *is_average_edges_d){
         
         tjnsssp_seg::iboffset_d = iboffset_d;
         tjnsssp_seg::isoffset_d = isoffset_d;
+        tjnsssp_seg::is_eparent_d = is_eparent_d;
 
         tjnsssp_seg::ib_edata_d = ib_edata_d;
         tjnsssp_seg::is_edata_d = is_edata_d;
@@ -83,6 +86,7 @@ namespace tjnsssp_seg{
         tjnsssp_seg::size_is_d = size_is_d;
 
         tjnsssp_seg::deltas_d = deltas_d;
+        tjnsssp_seg::deltas_parent_d = deltas_parent_d;
         tjnsssp_seg::values_d = values_d;
 
         tjnsssp_seg::cur_modified_size_d = cur_modified_size_d;
@@ -91,7 +95,7 @@ namespace tjnsssp_seg{
         tjnsssp_seg::num = num;
         tjnsssp_seg::is_modified_d = is_modified_d;
         tjnsssp_seg::last_modified_d = last_modified_d;
-        tjnsssp_seg::last_modified_d[FLAGS_sssp_source] = 1;
+        // tjnsssp_seg::last_modified_d[FLAGS_sssp_source] = 1;
 
         tjnsssp_seg::node_type_d = node_type_d;
         if(node_type_d[FLAGS_sssp_source] == 3){
@@ -131,7 +135,7 @@ namespace tjnsssp_seg{
         setCurSeg<<<1, 1>>>();
         cudaDeviceSynchronize();
 
-        getMaxValue<<<1, 1>>>();
+        // getMaxValue<<<1, 1>>>();
     }
 
     __global__
@@ -221,7 +225,7 @@ namespace tjnsssp_seg{
         }
         if(values_d[index] > deltas_d[index]){
             // values_d[cur_modified_node] = deltas_d[cur_modified_node];
-            atomicExch(&values_d[index], deltas_d[index]);
+            values_d[index] = deltas_d[index];
             for(unsigned int i = 0; i < e_num; i++){
                 unsigned int dist_node = iboffset_d[cur_iboff_d[index] - cur_seg_d[0] * ib_average_edges_d[0] + start + i];
                 // printf("dist node is %d",dist_node);
@@ -234,6 +238,8 @@ namespace tjnsssp_seg{
                 if(new_dist < deltas_d[dist_node]){
                     atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&last_modified_d[dist_node], 1);
+                    unsigned int e_parent = index;
+                    atomicExch(&deltas_parent_d[dist_node], e_parent);
                     if(node_type_d[dist_node] == 3){
                         atomicExch(&last_modified_d[dist_node], 2);
                     }
@@ -270,7 +276,7 @@ namespace tjnsssp_seg{
         }
         if(values_d[index] > deltas_d[index]){
             // values_d[cur_modified_node] = deltas_d[cur_modified_node];
-            atomicExch(&values_d[index], deltas_d[index]);
+            values_d[index] = deltas_d[index];
             for(unsigned int i = 0; i < e_num; i++){
                 unsigned int dist_node = isoffset_d[cur_isoff_d[index] - cur_seg_d[0] * is_average_edges_d[0] + start + i];
                 // printf("dist node is %d",dist_node);
@@ -283,6 +289,8 @@ namespace tjnsssp_seg{
                 if(new_dist < deltas_d[dist_node]){
                     atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&last_modified_d[dist_node], 1);
+                    unsigned int e_parent = is_eparent_d[i + cur_isoff_d[index] + start];
+                    atomicExch(&deltas_parent_d[dist_node], e_parent);
                     if(node_type_d[dist_node] == 3){
                         atomicExch(&last_modified_d[dist_node], 2);
                     }
@@ -322,7 +330,7 @@ namespace tjnsssp_seg{
             }
             if(values_d[index] > deltas_d[index]){
                 // values_d[cur_modified_node] = deltas_d[cur_modified_node];
-                atomicExch(&values_d[index], deltas_d[index]);
+                values_d[index] = deltas_d[index];
                 for(unsigned int i = 0; i < e_num; i++){
                     unsigned int dist_node = iboffset_d[cur_iboff_d[index] - cur_seg_d[0] * ib_average_edges_d[0] + start + i];
                     // printf("dist node is %d",dist_node);
@@ -335,6 +343,8 @@ namespace tjnsssp_seg{
                     if(new_dist < deltas_d[dist_node]){
                         atomicMin(&deltas_d[dist_node], new_dist);
                         atomicExch(&last_modified_d[dist_node], 1);
+                        unsigned int e_parent = index;
+                        atomicExch(&deltas_parent_d[dist_node], e_parent);
                         if(node_type_d[dist_node] == 3){
                             atomicExch(&last_modified_d[dist_node], 2);
                         }
@@ -368,7 +378,7 @@ namespace tjnsssp_seg{
             }
             if(values_d[index] > deltas_d[index]){
                 // values_d[cur_modified_node] = deltas_d[cur_modified_node];
-                atomicExch(&values_d[index], deltas_d[index]);
+                values_d[index] = deltas_d[index];
                 for(unsigned int i = 0; i < e_num; i++){
                     unsigned int dist_node = isoffset_d[cur_isoff_d[index] - cur_seg_d[0] * is_average_edges_d[0] + start + i];
                     // printf("dist node is %d",dist_node);
@@ -381,6 +391,8 @@ namespace tjnsssp_seg{
                     if(new_dist < deltas_d[dist_node]){
                         atomicMin(&deltas_d[dist_node], new_dist);
                         atomicExch(&last_modified_d[dist_node], 1);
+                        unsigned int e_parent = is_eparent_d[i + cur_isoff_d[index] + start];
+                        atomicExch(&deltas_parent_d[dist_node], e_parent);
                         if(node_type_d[dist_node] == 3){
                             atomicExch(&last_modified_d[dist_node], 2);
                         }

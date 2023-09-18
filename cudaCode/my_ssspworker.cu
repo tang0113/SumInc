@@ -350,8 +350,8 @@ namespace tjnsssp{
         else{
             unsigned int cur_modified_node = index;
             if(values_d[cur_modified_node] > deltas_d[cur_modified_node]){
-                // values_d[cur_modified_node] = deltas_d[cur_modified_node];
-                atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
+                values_d[cur_modified_node] = deltas_d[cur_modified_node];
+                // atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
                 for(unsigned int i = cur_oeoff_d[cur_modified_node]; i < size_oe_d[cur_modified_node] + cur_oeoff_d[cur_modified_node]; i++){
                     unsigned int dist_node = oeoffset_d[i];
                     // if(cur_modified_node == 9){
@@ -375,8 +375,8 @@ namespace tjnsssp{
     void sssp_nodeTypeZeroAndOne(int index){
         unsigned int cur_modified_node = index;
         if(values_d[cur_modified_node] > deltas_d[cur_modified_node]){
-            // values_d[cur_modified_node] = deltas_d[cur_modified_node];
-            atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
+            values_d[cur_modified_node] = deltas_d[cur_modified_node];
+            // atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
             for(unsigned int i = cur_iboff_d[cur_modified_node]; i < size_ib_d[cur_modified_node] + cur_iboff_d[cur_modified_node]; i++){
                 unsigned int dist_node = iboffset_d[i];
                 // if(cur_modified_node == 9){
@@ -398,8 +398,8 @@ namespace tjnsssp{
     void sssp_nodeTypeTwo(int index){
         unsigned int cur_modified_node = index;
         if(values_d[cur_modified_node] > deltas_d[cur_modified_node]){
-            // values_d[cur_modified_node] = deltas_d[cur_modified_node];
-            atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
+            values_d[cur_modified_node] = deltas_d[cur_modified_node];
+            // atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
             for(unsigned int i = cur_isoff_d[cur_modified_node]; i < size_is_d[cur_modified_node] + cur_isoff_d[cur_modified_node]; i++){
                 unsigned int dist_node = isoffset_d[i];
                 // if(cur_modified_node == 9){
@@ -421,8 +421,8 @@ namespace tjnsssp{
     void sssp_nodeTypeThree(int index){
         unsigned int cur_modified_node = index;
         if(values_d[cur_modified_node] > deltas_d[cur_modified_node]){
-            // values_d[cur_modified_node] = deltas_d[cur_modified_node];
-            atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
+            values_d[cur_modified_node] = deltas_d[cur_modified_node];
+            // atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
             //第一阶段
             for(unsigned int i = cur_iboff_d[cur_modified_node]; i < size_ib_d[cur_modified_node] + cur_iboff_d[cur_modified_node]; i++){
                 unsigned int dist_node = iboffset_d[i];

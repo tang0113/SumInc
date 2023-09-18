@@ -13,6 +13,8 @@
 #include "flags.h"
 #include <iomanip>
 #include "grape/fragment/compressor_base.h"
+#include "cudaCode/my_ssspworker_precompute.cuh"
+#include "cudaCode/freshman.h"
 
 // #define NUM_THREADS 52
 
@@ -701,27 +703,153 @@ class TravCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
         }
       });
 
+      vid_t *size_subgraph_d, *size_subgraph_h = (vid_t *)malloc(sizeof(vid_t) * this->all_node_num);
+      vid_t *cur_subgraph_d, *cur_subgraph_h = (vid_t *)malloc(sizeof(vid_t) * this->all_node_num);
+      unsigned int subgraph_offsize = 0;
+      for(int i=0;i < this->all_node_num;i++){
+        cur_subgraph_h[i] = subgraph_offsize;
+        subgraph_offsize += this->subgraph[i].size();
+        size_subgraph_h[i] = this->subgraph[i].size();
+      }
+      value_t *subgraph_data_d, *subgraph_data_h = (value_t *)malloc(sizeof(value_t) * subgraph_offsize);
+      vid_t *subgraph_neighbor_d, *subgraph_neighbor_h = (vid_t *)malloc(sizeof(vid_t) * subgraph_offsize);
+      unsigned int subgraph_curIndex = 0;
       auto& deltas = this->app_->deltas_;
       auto& values = this->app_->values_;
+      for(int i=0;i<this->all_node_num;i++){
+        vertex_t v(i);
+         auto& inner_oes = this->subgraph[v.GetValue()];
+         for(auto e : inner_oes){
+            int *temp = reinterpret_cast<int*>(&e.data);
+            subgraph_data_h[subgraph_curIndex] = *temp;
+            subgraph_neighbor_h[subgraph_curIndex++] = e.neighbor.GetValue();
+         }
+      }
+    //   for(int i=0;i < this->all_node_num;i++){
+    //     for(int j=0;j < this->subgraph[i].size();j++){
+    //         int* temp = reinterpret_cast<int*>(&this->subgraph[i][j].data);
+    //         // if(*temp < 0)LOG(INFO)<<"i is "<<i << "j is "<<j<<"value is "<<*temp<<"neighbor is "<<this->subgraph[i][j].neighbor.GetValue();
+    //         subgraph_data_h[subgraph_curIndex] = *temp;
+    //         subgraph_neighbor_h[subgraph_curIndex++] = this->subgraph[i][j].neighbor.GetValue();
+    //     }
+    //   }
+      cudaSetDevice(0);
+      cudaMalloc(&size_subgraph_d, sizeof(vid_t) * this->all_node_num);
+      cudaMalloc(&cur_subgraph_d, sizeof(vid_t) * this->all_node_num);
+      cudaMalloc(&subgraph_data_d, sizeof(value_t) * subgraph_offsize);
+      cudaMalloc(&subgraph_neighbor_d, sizeof(vid_t) * subgraph_offsize);
+      LOG(INFO) <<"cur is 000";
+      cudaMemcpy(size_subgraph_d, size_subgraph_h, sizeof(vid_t) * this->all_node_num, cudaMemcpyHostToDevice);
+      cudaMemcpy(cur_subgraph_d, cur_subgraph_h, sizeof(vid_t) * this->all_node_num, cudaMemcpyHostToDevice);
+      cudaMemcpy(subgraph_data_d, subgraph_data_h, sizeof(value_t) * subgraph_offsize, cudaMemcpyHostToDevice);
+      cudaMemcpy(subgraph_neighbor_d, subgraph_neighbor_h, sizeof(vid_t) * subgraph_offsize, cudaMemcpyHostToDevice);
+      LOG(INFO) <<"cur is 111";
+      tjnsssp_precompute::init_subgraph(size_subgraph_d, cur_subgraph_d, subgraph_data_d, subgraph_neighbor_d, this->old_node_num);
+      check();
+      
+
       size_t active_cluster_num = this->active_clusters.size();
-      double runTime = GetCurrentTime();
+      vid_t *modified_num_d, *modified_num_h = (vid_t *)malloc(sizeof(vid_t) * 1);
+      vid_t *modified_d, *modified_h = (vid_t *)malloc(sizeof(vid_t) * this->all_node_num);
+      modified_num_h[0] = 0;
+
       parallel_for(vid_t i = 0; i < active_cluster_num; i++) {
         if (this->active_clusters[i] == 1) {
           vid_t spids = i;
           // reset out-mirror /
+          std::vector<vertex_t> &node_set = this->supernode_ids[spids];
+          modified_num_h[0] += node_set.size();
+          for(int i=0;i<node_set.size();i++){
+            modified_h[node_set[i].GetValue()] = 1;
+          }
           std::vector<vertex_t> &out_mirror_node_set = this->cluster_out_mirror_ids[spids]; // include mirror
           for(auto m : out_mirror_node_set){
             vertex_t v = this->mirrorid2vid[m];
             deltas[m] = this->app_->GetInitDelta(v); // 注意，需要再次修改delta/values的大小，因为新图的没有包括Mirror点
             values[m] = this->app_->GetInitValue(v); // reinit里面初始化了,这个应该可以不用初始化
           }
-        //   runTime = GetCurrentTime();
-          run_to_convergence_for_precpt(spids, new_graph);
-        //   runTime = GetCurrentTime() - runTime;
+          if(!FLAGS_gpu_start){
+            run_to_convergence_for_precpt(spids, new_graph);
+          }
         }
       }
-      runTime = GetCurrentTime() - runTime;
-      LOG(INFO) << "run time is "<<runTime;
+      if(FLAGS_gpu_start){
+        value_t *deltas_d, *deltas_h = (value_t *)malloc(sizeof(value_t) * this->all_node_num);
+        vid_t *deltas_parent_d, *deltas_parent_h = (vid_t *)malloc(sizeof(vid_t) * this->all_node_num);
+        value_t *values_d;
+        values.fake2buffer();
+        deltas.fake2buffer();
+        for(int i=0;i<this->all_node_num;i++){
+            deltas_h[i] = deltas.data_buffer[i].value;
+            deltas_parent_h[i] = deltas.data_buffer[i].parent_gid;
+        }
+        // for(int i=0;i<this->all_node_num;i++){
+        //     vertex_t temp(i);
+        //     if(deltas[temp].value < 0){
+        //         LOG(INFO) << "deltas i is "<<deltas[temp].value;
+        //     }
+        // }
+        cudaMalloc(&modified_d, sizeof(vid_t) * this->all_node_num);
+        cudaMalloc(&modified_num_d, sizeof(vid_t) * 1);
+        cudaMalloc(&deltas_d, sizeof(value_t) * this->all_node_num);
+        cudaMalloc(&deltas_parent_d, sizeof(value_t) * this->all_node_num);
+        cudaMalloc(&values_d, sizeof(value_t) * this->all_node_num);
+        check();
+        cudaMemcpy(modified_d, modified_h, sizeof(vid_t) * this->all_node_num, cudaMemcpyHostToDevice);
+        cudaMemcpy(deltas_d, deltas_h, sizeof(value_t) * this->all_node_num, cudaMemcpyHostToDevice);
+        cudaMemcpy(deltas_parent_d, deltas_parent_h, sizeof(vid_t) * this->all_node_num, cudaMemcpyHostToDevice);
+        cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * this->all_node_num, cudaMemcpyHostToDevice);
+        cudaMemcpy(modified_num_d, modified_num_h, sizeof(vid_t) * 1, cudaMemcpyHostToDevice);
+        
+        tjnsssp_precompute::init_modified(modified_d, deltas_d, deltas_parent_d, values_d, modified_num_d);
+        int step = 0;
+        while(modified_num_h[0] && step < 50){
+            step++;
+            tjnsssp_precompute::compute(this->all_node_num);
+            cudaMemcpy(modified_num_h, modified_num_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
+            // LOG(INFO) << "step is "<<step;
+            // LOG(INFO) << "modi size is "<<modified_num_h[0];
+        }
+        LOG(INFO) << "converge step is "<<step;
+        deltas.fake2buffer();
+        values.fake2buffer();
+        cudaMemcpy(deltas_h, deltas_d, sizeof(value_t) * this->all_node_num, cudaMemcpyDeviceToHost);
+        cudaMemcpy(deltas_parent_h, deltas_parent_d, sizeof(vid_t) * this->all_node_num, cudaMemcpyDeviceToHost);
+        cudaMemcpy(values.data_buffer, values_d, sizeof(value_t) * this->all_node_num, cudaMemcpyDeviceToHost);
+        for(int i = 0;i < this->all_node_num;i++){
+        // if(deltas.data_buffer[i].value != deltas_h[i])LOG(INFO) << "no";
+        deltas.data_buffer[i].value = deltas_h[i];
+        deltas.data_buffer[i].parent_gid = deltas_parent_h[i];
+        }
+        deltas.buffer2fake();
+        values.buffer2fake();
+        
+        
+        cudaFree(deltas_d);
+        cudaFree(deltas_parent_d);
+        cudaFree(values_d);
+        
+        free(deltas_h);
+        free(deltas_parent_h);
+      }
+      cudaFree(modified_d);
+      cudaFree(modified_num_d);
+      cudaFree(size_subgraph_d);
+      cudaFree(cur_subgraph_d);
+      cudaFree(subgraph_data_d);
+      cudaFree(subgraph_neighbor_d);
+
+      free(modified_h);
+      free(modified_num_h);
+      free(size_subgraph_h);
+      free(cur_subgraph_h);
+      free(subgraph_data_h);
+      free(subgraph_neighbor_h);
+    //   for(int i=0;i<1000;i++){
+    //     vertex_t v(i);
+    //     LOG(INFO) << "i is "<<i <<", deltas[i] is "<<deltas[v];
+    //   }
+
       // get active node from out_mirror /
       parallel_for(vid_t i = 0; i < active_cluster_num; i++) {
         if (this->active_clusters[i] == 1) {

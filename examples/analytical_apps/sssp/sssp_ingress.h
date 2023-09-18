@@ -121,6 +121,8 @@ class SSSPIngress : public TraversalAppBase<FRAG_T, VALUE_T> {
   void Compute(const vertex_t& v, const value_t& value, const delta_t& delta,
                 const adj_list_t& oes, const Nbr<vid_t, edata_t>& oe, delta_t& outv) override {
     auto new_dist = delta.value + oe.data;
+    // if(oe.data < 0)printf("no");
+    // auto new_dist = delta.value + 1;// 测试
     outv = this->GenDelta(v, new_dist);
     //atomic_add(this->f_send_delta_num, (long long)1); // // 注意为了不在此处发生线程阻塞，放到了iter_commpress.h里面
   }
