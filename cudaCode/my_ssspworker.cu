@@ -385,10 +385,14 @@ namespace tjnsssp{
                 // int new_dist = ib_edata_d[i] + deltas_d[cur_modified_node];//权重图
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                 if(new_dist < deltas_d[dist_node]){
-                    atomicMin(&deltas_d[dist_node], new_dist);
+                    int old = atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&is_modified_d[dist_node], 1);
                     unsigned int e_parent = cur_modified_node;
-                    atomicExch(&deltas_parent_d[dist_node], e_parent);
+                    if(old > new_dist)
+                        atomicExch(&deltas_parent_d[dist_node], e_parent);
+                    if(dist_node == 5){
+                        printf("5 1 is %d",cur_modified_node);
+                    }
                 }
             }
         }
@@ -408,10 +412,14 @@ namespace tjnsssp{
                 // int new_dist = is_edata_d[i] + deltas_d[cur_modified_node];//权重图
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                 if(new_dist < deltas_d[dist_node]){
-                    atomicMin(&deltas_d[dist_node], new_dist);
+                    int old = atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&is_modified_d[dist_node], 1);
                     unsigned int e_parent = is_eparent_d[i];
-                    atomicExch(&deltas_parent_d[dist_node], e_parent);
+                    if(old > new_dist)
+                        atomicExch(&deltas_parent_d[dist_node], e_parent);
+                    if(dist_node == 5){
+                        printf("5 2 is %d",is_eparent_d[dist_node]);
+                    }
                 }
             }
         }
@@ -431,11 +439,19 @@ namespace tjnsssp{
                 // }
                 // int new_dist = ib_edata_d[i] + deltas_d[cur_modified_node];//权重图
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
+                if(index == 104804 && dist_node == 5){
+                        printf("new dist is %d",new_dist);
+                        printf("deltas is %d",deltas_d[dist_node]);   
+                    }
                 if(new_dist < deltas_d[dist_node]){
-                    atomicMin(&deltas_d[dist_node], new_dist);
+                    int old = atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&is_modified_d[dist_node], 1);
                     unsigned int e_parent = cur_modified_node;
-                    atomicExch(&deltas_parent_d[dist_node], e_parent);
+                    if(old > new_dist)
+                        atomicExch(&deltas_parent_d[dist_node], e_parent);
+                    if(dist_node == 5){
+                        printf("5 31 is %d",cur_modified_node);
+                    }
                 }
             }
             //第二阶段
@@ -447,10 +463,14 @@ namespace tjnsssp{
                 // int new_dist = ib_edata_d[i] + deltas_d[cur_modified_node];//权重图
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                 if(new_dist < deltas_d[dist_node]){
-                    atomicMin(&deltas_d[dist_node], new_dist);
+                    int old = atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&is_modified_d[dist_node], 1);
                     unsigned int e_parent = is_eparent_d[i];
-                    atomicExch(&deltas_parent_d[dist_node], e_parent);
+                    if(old > new_dist)
+                        atomicExch(&deltas_parent_d[dist_node], e_parent);
+                    if(dist_node == 5){
+                        printf("5 32 is %d",is_eparent_d[dist_node]);
+                    }
                 }
             }
         }

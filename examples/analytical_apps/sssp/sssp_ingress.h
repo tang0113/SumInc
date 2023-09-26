@@ -72,8 +72,9 @@ class SSSPIngress : public TraversalAppBase<FRAG_T, VALUE_T> {
       granular_for(j, 0, out_degree, (out_degree > 1024), {
         auto& e = *(it + j);
         auto v = e.neighbor;
-        // auto new_dist = e.data + dist;//权重图
-        auto new_dist = 1 + dist;//无权测试
+        // auto new_dist = e.data + dist;
+        // printf("data is %d",e.data);
+        auto new_dist = 1 + dist;
         // LOG(INFO) << "vid:" << u.GetValue()
         //           << " ->" << v.GetValue()
         //           << " w=" << delta.value;
@@ -143,6 +144,10 @@ class SSSPIngress : public TraversalAppBase<FRAG_T, VALUE_T> {
         auto v = e.neighbor;
         // auto new_dist = e.data + dist;//权重图
         auto new_dist = 1 + dist;//无权测试
+        if(u.GetValue() == 1&& v.GetValue()==5){
+        //  printf("new dist is %d",new_dist);
+          printf("deltas is %d",delta);   
+        }
         // LOG(INFO) << "vid:" << u.GetValue()
         //           << " ->" << v.GetValue()
         //           << " w=" << delta.value;

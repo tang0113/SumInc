@@ -121,6 +121,26 @@ namespace tjn{
 
   }
 
+  __global__
+  void deltaSum_real(float *result_d){
+    int index = threadIdx.x + blockIdx.x + blockDim.x;
+    if(index < end_d - start_d){
+      atomicAdd(&result_d[0], deltas_d[index]);
+    }
+  }
+  float deltaSum(unsigned int start, unsigned int end){
+    dim3 block(512);
+    dim3 grid((end - start - 1) / block.x + 1);
+    float *result_h = (float *)malloc(sizeof(float) * 1);
+    result_h[0] = 0;
+    float *result_d;
+    cudaMalloc(&result_d, sizeof(float) * 1);
+    cudaMemcpy(result_d, result_h, sizeof(float) * 1, cudaMemcpyHostToDevice);
+    deltaSum_real<<<grid, block>>>(result_d);
+    cudaMemcpy(result_h, result_d, sizeof(float) * 1, cudaMemcpyDeviceToHost);
+    return result_h[0];
+  }
+
   void g_function_pr(unsigned int start_d, unsigned int end_d){
     dim3 block(512);
     dim3 grid((end_d - start_d - 1) / block.x + 1);

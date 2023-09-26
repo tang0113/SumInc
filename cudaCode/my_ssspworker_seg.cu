@@ -239,9 +239,13 @@ namespace tjnsssp_seg{
                     atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&last_modified_d[dist_node], 1);
                     unsigned int e_parent = index;
-                    atomicExch(&deltas_parent_d[dist_node], e_parent);
+                    if(new_dist == deltas_d[dist_node])
+                        atomicExch(&deltas_parent_d[dist_node], e_parent);
                     if(node_type_d[dist_node] == 3){
                         atomicExch(&last_modified_d[dist_node], 2);
+                    }
+                    if(dist_node == 5){
+                        printf("5 1 is %d",index);
                     }
                     
                 }
@@ -290,9 +294,13 @@ namespace tjnsssp_seg{
                     atomicMin(&deltas_d[dist_node], new_dist);
                     atomicExch(&last_modified_d[dist_node], 1);
                     unsigned int e_parent = is_eparent_d[i + cur_isoff_d[index] + start];
-                    atomicExch(&deltas_parent_d[dist_node], e_parent);
+                    if(new_dist == deltas_d[dist_node])
+                        atomicExch(&deltas_parent_d[dist_node], e_parent);
                     if(node_type_d[dist_node] == 3){
                         atomicExch(&last_modified_d[dist_node], 2);
+                    }
+                    if(dist_node == 5){
+                        printf("5 2 is %d",is_eparent_d[dist_node]);
                     }
                     
                 }
@@ -333,6 +341,7 @@ namespace tjnsssp_seg{
                 values_d[index] = deltas_d[index];
                 for(unsigned int i = 0; i < e_num; i++){
                     unsigned int dist_node = iboffset_d[cur_iboff_d[index] - cur_seg_d[0] * ib_average_edges_d[0] + start + i];
+                    
                     // printf("dist node is %d",dist_node);
                     // printf("cur off is %d",cur_iboff_d[index] - cur_seg_d[0] * ib_average_edges_d[0] + start + i);
                     // if(cur_modified_node == 9){
@@ -340,13 +349,21 @@ namespace tjnsssp_seg{
                     // }
                     // int new_dist = ib_edata_d[i] + deltas_d[cur_modified_node];//权重图
                     int new_dist = 1 + deltas_d[index];//无权测试
+                    if(index == 1 && dist_node == 5){
+                        printf("new dist is %d",new_dist);
+                        printf("deltas is %d",deltas_d[index]);   
+                    }
                     if(new_dist < deltas_d[dist_node]){
                         atomicMin(&deltas_d[dist_node], new_dist);
                         atomicExch(&last_modified_d[dist_node], 1);
                         unsigned int e_parent = index;
-                        atomicExch(&deltas_parent_d[dist_node], e_parent);
+                        if(new_dist == deltas_d[dist_node])
+                            atomicExch(&deltas_parent_d[dist_node], e_parent);
                         if(node_type_d[dist_node] == 3){
                             atomicExch(&last_modified_d[dist_node], 2);
+                        }
+                        if(dist_node == 5){
+                            printf("5 31 is %d",index);
                         }
                     }
                 }
@@ -392,9 +409,13 @@ namespace tjnsssp_seg{
                         atomicMin(&deltas_d[dist_node], new_dist);
                         atomicExch(&last_modified_d[dist_node], 1);
                         unsigned int e_parent = is_eparent_d[i + cur_isoff_d[index] + start];
-                        atomicExch(&deltas_parent_d[dist_node], e_parent);
+                        if(new_dist == deltas_d[dist_node])
+                            atomicExch(&deltas_parent_d[dist_node], e_parent);
                         if(node_type_d[dist_node] == 3){
                             atomicExch(&last_modified_d[dist_node], 2);
+                        }
+                        if(dist_node == 5){
+                            printf("5 32 is %d",is_eparent_d[dist_node]);
                         }
                     }
                 }

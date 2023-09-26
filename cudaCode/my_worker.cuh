@@ -111,5 +111,7 @@ namespace tjn{
 
     __device__
     void pr_bothOutInMaster(int index);
+
+    float deltaSum(unsigned int start, unsigned int end);
 }
 #endif

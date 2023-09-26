@@ -11,6 +11,8 @@
 #include <iomanip>
 #include "grape/fragment/compressor_base.h"
 #include <atomic>
+#include "my_worker_precompute.cuh"
+#include "freshman.h"
 
 // #define NUM_THREADS 52
 
@@ -559,11 +561,92 @@ class IterCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
                 values[v] = this->app_->default_v();
             }
             /* internal iteration */
-            size_t update_ids_num = this->update_cluster_ids.size();
-            parallel_for(vid_t j = 0; j < update_ids_num; j++){
-                vid_t ids_id = this->update_cluster_ids[j];
-                run_to_convergence_for_precpt(ids_id);
+            value_t *deltas_d;
+            value_t *values_d;
+            cudaSetDevice(0);
+            // LOG(INFO) << "oes size is "<<this->old_node_num;
+            // LOG(INFO) << "all node num is "<<this->all_node_num;
+            cudaMalloc(&deltas_d, sizeof(value_t) * this->all_node_num);
+            cudaMalloc(&values_d, sizeof(value_t) * this->all_node_num);
+            values.fake2buffer();
+            deltas.fake2buffer();
+            LOG(INFO) << "all node num is "<<this->all_node_num;
+            LOG(INFO) << "oes num is "<<this->old_node_num;
+            cudaMemcpy(deltas_d, deltas.data_buffer, sizeof(value_t) * this->all_node_num, cudaMemcpyHostToDevice);
+            cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * this->all_node_num, cudaMemcpyHostToDevice);
+            vid_t *size_subgraph_d, *size_subgraph_h = (vid_t *)malloc(sizeof(vid_t) * this->all_node_num);
+            vid_t *size_oes_d, *size_oes_h = (vid_t *)malloc(sizeof(vid_t) * this->old_node_num);
+            vid_t *cur_subgraph_d, *cur_subgraph_h = (vid_t *)malloc(sizeof(vid_t) * this->all_node_num);
+            unsigned int subgraph_offsize = 0;
+            for(int i=0;i < this->all_node_num;i++){
+                cur_subgraph_h[i] = subgraph_offsize;
+                subgraph_offsize += this->subgraph[i].size();
+                size_subgraph_h[i] = this->subgraph[i].size();
             }
+            for(int i=0;i < this->old_node_num;i++){
+                // LOG(INFO) << "-2";
+                vertex_t v(i);
+                size_oes_h[i] = this->graph_->GetOutgoingAdjList(v).Size();
+            }
+            vid_t *subgraph_neighbor_d, *subgraph_neighbor_h = (vid_t *)malloc(sizeof(vid_t) * subgraph_offsize);
+            unsigned int subgraph_curIndex = 0;
+            for(int i=0;i<this->all_node_num;i++){
+                vertex_t v(i);
+                auto& inner_oes = this->subgraph[v.GetValue()];
+                for(auto e : inner_oes){
+                    subgraph_neighbor_h[subgraph_curIndex++] = e.neighbor.GetValue();
+                }  
+            }
+            bool *is_active_d, *is_active_h = (bool *)malloc(sizeof(bool) * this->old_node_num);
+            cudaMalloc(&is_active_d, sizeof(bool) * this->old_node_num);
+            cudaMalloc(&size_oes_d, sizeof(vid_t) * this->old_node_num);
+            cudaMalloc(&size_subgraph_d, sizeof(vid_t) * this->all_node_num);
+            cudaMalloc(&cur_subgraph_d, sizeof(vid_t) * this->all_node_num);
+            cudaMalloc(&subgraph_neighbor_d, sizeof(vid_t) * subgraph_offsize);
+            
+            cudaMemcpy(size_oes_d, size_oes_h, sizeof(vid_t) * this->old_node_num, cudaMemcpyHostToDevice);
+            cudaMemcpy(size_subgraph_d, size_subgraph_h, sizeof(vid_t) * this->all_node_num, cudaMemcpyHostToDevice);
+            cudaMemcpy(cur_subgraph_d, cur_subgraph_h, sizeof(vid_t) * this->all_node_num, cudaMemcpyHostToDevice);
+            cudaMemcpy(subgraph_neighbor_d, subgraph_neighbor_h, sizeof(vid_t) * subgraph_offsize, cudaMemcpyHostToDevice);
+            check();
+            tjnpr_precompute::init_subgraph(deltas_d, values_d, size_oes_d, size_subgraph_d, cur_subgraph_d, subgraph_neighbor_d, this->old_node_num, is_active_d);
+            size_t update_ids_num = this->update_cluster_ids.size();
+            bool convergence = false;
+            for(vid_t j = 0; j < update_ids_num; j++){
+                vid_t ids_id = this->update_cluster_ids[j];
+                if(!FLAGS_gpu_start){
+                    run_to_convergence_for_precpt(ids_id);
+                }
+                if(FLAGS_gpu_start){
+                    convergence = false;
+                    std::vector<vertex_t> &node_set = this->supernode_ids[ids_id];
+                    for(auto v : node_set){
+                        is_active_h[v.GetValue()] = true;
+                    }
+                    double threshold = FLAGS_termcheck_threshold / this->old_node_num * this->supernode_ids[ids_id].size();
+                    while(!convergence){
+                        cudaMemcpy(is_active_d, is_active_h, sizeof(bool) * this->old_node_num, cudaMemcpyHostToDevice);
+                        convergence = tjnpr_precompute::compute(this->old_node_num, threshold);
+                        check();
+                        // LOG(INFO) << "convergence is "<<convergence;
+                        // cudaMemcpy(is_active_h, is_active_d, sizeof(bool) * this->old_node_num, cudaMemcpyDeviceToHost);
+                    }
+                }
+            }
+            cudaFree(deltas_d);
+            cudaFree(values_d);
+
+            free(size_oes_h);
+            free(size_subgraph_h);
+            free(cur_subgraph_h);
+            free(subgraph_neighbor_h);
+            free(is_active_h);
+
+            cudaFree(size_oes_d);
+            cudaFree(size_subgraph_d);
+            cudaFree(cur_subgraph_d);
+            cudaFree(subgraph_neighbor_d);
+            cudaFree(is_active_d);
         }
     }
 
@@ -625,6 +708,7 @@ class IterCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
                 break;
             }
         }
+        // LOG(INFO) << "step is "<<step;
     }
 
     void init_node(const std::vector<vertex_t> &node_set, const vertex_t& source){

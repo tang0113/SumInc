@@ -111,6 +111,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
   }
 
   void deltaCompute() {
+    LOG(INFO) << " app_->curr_modified_.size()=" << app_->next_modified_.ParallelCount(thread_num());
     IncFragmentBuilder<fragment_t> inc_fragment_builder(fragment_,
                                                         FLAGS_directed);
 
@@ -292,7 +293,9 @@ class SumSyncTraversalWorker : public ParallelEngine {
     const std::shared_ptr<fragment_t>& new_graph = inc_fragment_builder.Build();
     if(FLAGS_compress){
       auto added_edges = inc_fragment_builder.GetAddedEdgesGid();
+      LOG(INFO) << " app_->curr_modified_.size()=" << next_modified.ParallelCount(thread_num());
       cpr_->inc_run(deleted_edges, added_edges, new_graph);
+      LOG(INFO) << " app_->curr_modified_.size()=" << next_modified.ParallelCount(thread_num());
       print_active_edge("#inc_run_cmpIndex");
     }
     fragment_ = new_graph;
@@ -311,7 +314,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
       app_->values_[v] = values[v];
       app_->deltas_[v] = deltas[v];
     }
-
+    LOG(INFO) << " app_->curr_modified_.size()=" << next_modified.ParallelCount(thread_num());;
     // Start a round without any condition
     double resend_time = GetCurrentTime();
     vid_t inner_node_num = inner_vertices.end().GetValue() 
@@ -323,8 +326,11 @@ class SumSyncTraversalWorker : public ParallelEngine {
 
       if (delta.value != app_->GetIdentityElement()) {
         app_->Compute(u, value, delta, next_modified);
+        // LOG(INFO) << " app_->curr_modified_.size()=" << app_->next_modified_.ParallelCount(thread_num());
       }
     }
+    LOG(INFO) << " app_->curr_modified_.size()=" << next_modified.ParallelCount(thread_num());;
+ 
 
     #if defined(DISTRIBUTED)
     messages_.StartARound();
@@ -911,6 +917,10 @@ class SumSyncTraversalWorker : public ParallelEngine {
           }
         }
       }
+      // for(int i=0;i<100;i++){
+      //   vertex_t temp(i);
+      //   LOG(INFO) << "is parent "<<i<<"is"<<is_eparent_h[i];
+      // }
       if(!FLAGS_compress){
         for(int i = 0; i < num; i++){
           for(int j = 0;j < size_oe_h[i]; j++){
@@ -925,8 +935,9 @@ class SumSyncTraversalWorker : public ParallelEngine {
       values.fake2buffer();
       deltas.fake2buffer();
       for(int i = 0;i < (FLAGS_compress ? cpr_->all_node_num : num);i++){
-        deltas_h[i] = deltas.data_buffer[i].value;
-        deltas_parent_h[i] = deltas.data_buffer[i].parent_gid;
+        vertex_t temp(i);
+        deltas_h[i] = deltas[temp].value;
+        deltas_parent_h[i] = deltas[temp].parent_gid;
         // LOG(INFO) <<"i is "<<i<<"deltas parent" << deltas.data_buffer[i].parent_gid;
       }
       cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * oe_offsize, cudaMemcpyHostToDevice);
@@ -1269,12 +1280,17 @@ class SumSyncTraversalWorker : public ParallelEngine {
               cudaMemcpy(values.data_buffer, values_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
               for(int i = 0;i < (FLAGS_gpu_start ? cpr_->all_node_num : num);i++){
                 // if(deltas.data_buffer[i].value != deltas_h[i])LOG(INFO) << "no";
-                deltas.data_buffer[i].value = deltas_h[i];
-                deltas.data_buffer[i].parent_gid = deltas_parent_h[i];
+                vertex_t temp(i);
+                deltas[temp].value = deltas_h[i];
+                deltas[temp].parent_gid = deltas_parent_h[i];
               }
               deltas.buffer2fake();
               values.buffer2fake();
           }
+          for(int i = 0;i<100;i++){
+              vertex_t temp(i);
+              LOG(INFO) << "deltas  parent"<<i<<"is"<<deltas[temp].parent_gid;
+            }
           if(compr_stage){
             LOG(INFO) << "start correct...";
             // check_result("correct before");
@@ -1785,13 +1801,13 @@ class SumSyncTraversalWorker : public ParallelEngine {
       vid_t *is_eparent_d, *is_eparent_h = (vid_t *)malloc(sizeof(vid_t) * is_offsize);
       cudaMalloc(&is_eparent_d, sizeof(vid_t) * is_offsize);
 
+
       unsigned int CurIndex = 0;
       for(int i=0;i<num;i++){
         for(int j=0;j < size_is_h[i];j++){
           is_eparent_h[CurIndex++] = is_e_offset_[i][j].data.parent_gid;
         }
       }
-
       for(int i=0;i<FLAGS_seg_num;i++){
           unsigned int ib_curIndex = 0, is_curIndex = 0;
           for(int j=ib_seg_start[i];j<ib_seg_end[i];j++){
@@ -1843,26 +1859,27 @@ class SumSyncTraversalWorker : public ParallelEngine {
           }
           
       }
-      for(int i=0;i<FLAGS_seg_num;i++){
-        LOG(INFO) << "ib seg "<<i<<":start node is "<<ib_seg_start[i]<<" end node is "<<ib_seg_end[i];
-        LOG(INFO) << "is seg "<<i<<":start node is "<<is_seg_start[i]<<" end node is "<<is_seg_end[i];
-        for(int j=0;j<100;j++){
-          if(i==0){
-            LOG(INFO)<<iboffset_h[i][j];
-          }
-        }
-      }
-      for(int i=8;i<10;i++){
-        for(int j = 0;j < size_ib_h[i];j++){
+      // for(int i=0;i<FLAGS_seg_num;i++){
+      //   LOG(INFO) << "ib seg "<<i<<":start node is "<<ib_seg_start[i]<<" end node is "<<ib_seg_end[i];
+      //   LOG(INFO) << "is seg "<<i<<":start node is "<<is_seg_start[i]<<" end node is "<<is_seg_end[i];
+      //   for(int j=0;j<100;j++){
+      //     if(i==0){
+      //       LOG(INFO)<<iboffset_h[i][j];
+      //     }
+      //   }
+      // }
+      // for(int i=8;i<10;i++){
+      //   for(int j = 0;j < size_ib_h[i];j++){
           
-          LOG(INFO)<<ib_e_offset_[i][j].neighbor.GetValue();
-        }
-      }
+      //     LOG(INFO)<<ib_e_offset_[i][j].neighbor.GetValue();
+      //   }
+      // }
       values.fake2buffer();
       deltas.fake2buffer();
       for(int i=0;i<(FLAGS_compress ? cpr_->all_node_num : num);i++){
-          deltas_h[i] = deltas.data_buffer[i].value;
-          deltas_parent_h[i] = deltas.data_buffer[i].parent_gid;
+          vertex_t temp(i);
+          deltas_h[i] = deltas[temp].value;
+          deltas_parent_h[i] = deltas[temp].parent_gid;
       }
 
       for(int i = 0; i < num; i++){
@@ -1878,7 +1895,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
 
       cudaMemcpy(size_ib_d, size_ib_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
       cudaMemcpy(size_is_d, size_is_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
-      cudaMemcpy(is_eparent_d, is_eparent_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+      cudaMemcpy(is_eparent_d, is_eparent_h, sizeof(vid_t) * is_offsize, cudaMemcpyHostToDevice);
       check();
 
       unsigned int sssp_source = FLAGS_sssp_source;
@@ -1993,7 +2010,66 @@ class SumSyncTraversalWorker : public ParallelEngine {
           }
           if (compr_stage) {
             if(!FLAGS_gpu_start){
-              
+              ForEach(
+                  app_->curr_modified_, inner_vertices, [this, &compr_stage, &count, &step](int tid, vertex_t u) {
+                    char type = node_type[u.GetValue()];
+                    auto& delta = app_->deltas_[u];
+                    auto& value = app_->values_[u];
+                    if (type == 0) {
+                      /* 0: out node */
+                      // auto& value = app_->values_[u];
+                      auto last_value = value;
+                      // We don't cleanup delta with identity element, since we expect
+                      // the algorithm is monotonic
+                      // auto& delta = app_->deltas_[u];
+                      if (app_->CombineValueDelta(value, delta)) {
+                        app_->Compute(u, last_value, delta, app_->next_modified_);
+                      }
+                    }
+                    else if (type == 1) {
+                      /* 1: bound node */
+                      // auto& value = app_->values_[u];
+                      auto last_value = value;
+                      // We don't cleanup delta with identity element, since we expect
+                      // the algorithm is monotonic
+                      // auto& delta = app_->deltas_[u];
+
+                      if (app_->CombineValueDelta(value, delta)) {
+                        adj_list_t oes = adj_list_t(ib_e_offset_[u.GetValue()], ib_e_offset_[u.GetValue()+1]);
+                        app_->Compute(u, last_value, delta, oes, app_->next_modified_);
+                      }
+                    }
+                    else if (type == 2) {
+                      /* 2: source node */
+                      // auto& value = app_->values_[u];
+                      auto last_value = value;
+                      // We don't cleanup delta with identity element, since we expect
+                      // the algorithm is monotonic
+                      // auto& delta = app_->deltas_[u];
+
+                      if (app_->CombineValueDelta(value, delta)) {
+                        adj_list_index_t oes = adj_list_index_t(is_e_offset_[u.GetValue()], is_e_offset_[u.GetValue()+1]);
+                        app_->ComputeByIndexDelta(u, last_value, delta, oes, app_->next_modified_);
+                        // app_->CombineValueDelta(spnode.data, delta);
+                      }
+                    }
+                    else if (type == 3) {
+                      // auto& value = app_->values_[u];
+                      auto last_value = value;
+                      // We don't cleanup delta with identity element, since we expect
+                      // the algorithm is monotonic
+                      // auto& delta = app_->deltas_[u];
+
+                      if (app_->CombineValueDelta(value, delta)) {
+                        /* 1: bound node */
+                        adj_list_t oes_b = adj_list_t(ib_e_offset_[u.GetValue()], ib_e_offset_[u.GetValue()+1]);
+                        app_->Compute(u, last_value, delta, oes_b, app_->next_modified_);
+                        /* 2: source node */
+                        adj_list_index_t oes_s = adj_list_index_t(is_e_offset_[u.GetValue()], is_e_offset_[u.GetValue()+1]);
+                        app_->ComputeByIndexDelta(u, last_value, delta, oes_s, app_->next_modified_);
+                      }
+                    }
+                  });
             }
             if(FLAGS_gpu_start){
               cudaMemcpy(iboffset_d, iboffset_h[cur_seg], sizeof(vid_t) * ib_average_edges, cudaMemcpyHostToDevice);
@@ -2011,20 +2087,20 @@ class SumSyncTraversalWorker : public ParallelEngine {
         }
 
         auto& channels = messages_.Channels();
-        // ForEach(app_->next_modified_, outer_vertices,
-        //         [&channels, vm_ptr, fid, this](int tid, vertex_t v) {
-        //           auto& delta_to_send = app_->deltas_[v];
+        ForEach(app_->next_modified_, outer_vertices,
+                [&channels, vm_ptr, fid, this](int tid, vertex_t v) {
+                  auto& delta_to_send = app_->deltas_[v];
 
-        //           if (delta_to_send.value != app_->GetIdentityElement()) {
-        //             vid_t& v_parent_gid = delta_to_send.parent_gid;
-        //             fid_t v_fid = vm_ptr->GetFidFromGid(v_parent_gid);
-        //             if (v_fid == fid) {
-        //               v_parent_gid = newGid2oldGid[v_parent_gid];
-        //             }
-        //             channels[tid].SyncStateOnOuterVertex(*fragment_, v,
-        //                                                 delta_to_send);
-        //           }
-        //         });
+                  if (delta_to_send.value != app_->GetIdentityElement()) {
+                    vid_t& v_parent_gid = delta_to_send.parent_gid;
+                    fid_t v_fid = vm_ptr->GetFidFromGid(v_parent_gid);
+                    if (v_fid == fid) {
+                      v_parent_gid = newGid2oldGid[v_parent_gid];
+                    }
+                    channels[tid].SyncStateOnOuterVertex(*fragment_, v,
+                                                        delta_to_send);
+                  }
+                });
         if (!app_->next_modified_.PartialEmpty(0, fragment_->GetInnerVerticesNum())) {
           messages_.ForceContinue();
         }
@@ -2045,11 +2121,16 @@ class SumSyncTraversalWorker : public ParallelEngine {
                 cudaMemcpy(values.data_buffer, values_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyDeviceToHost);
                 for(int i = 0;i < (FLAGS_gpu_start ? cpr_->all_node_num : num);i++){
                   // if(deltas.data_buffer[i].value != deltas_h[i])LOG(INFO) << "no";
-                  deltas.data_buffer[i].value = deltas_h[i];
-                  deltas.data_buffer[i].parent_gid = deltas_parent_h[i];
+                  vertex_t temp(i);
+                  deltas[temp].value = deltas_h[i];
+                  deltas[temp].parent_gid = deltas_parent_h[i];
                 }
                 deltas.buffer2fake();
                 values.buffer2fake();
+            }
+            for(int i = 0;i<100;i++){
+              vertex_t temp(i);
+              LOG(INFO) << "deltas  parent "<<i<<"is"<<deltas[temp].parent_gid;
             }
             if(compr_stage){
             LOG(INFO) << "start correct...";
