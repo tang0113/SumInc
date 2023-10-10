@@ -123,7 +123,7 @@ namespace tjn{
 
   __global__
   void deltaSum_real(float *result_d){
-    int index = threadIdx.x + blockIdx.x + blockDim.x;
+    int index = threadIdx.x + blockIdx.x * blockDim.x;
     if(index < end_d - start_d){
       atomicAdd(&result_d[0], deltas_d[index]);
     }
@@ -415,7 +415,6 @@ namespace tjn{
       }
 
       atomicAdd(&values_d[index], delta);
-
       for(unsigned int i=cur_syncoff_d[index];i<cur_syncoff_d[index] + size_sync_d[index];i++){
         atomicAdd(&deltas_d[syncoffset_d[i]],delta);
         float delta = atomicExch(&deltas_d[syncoffset_d[i]],0);

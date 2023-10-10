@@ -28,15 +28,15 @@ namespace tjnpr_precompute{
     }
     __global__
     void delta_sum(){
-        int index = threadIdx.x + blockIdx.x + blockDim.x;
+        int index = threadIdx.x + blockIdx.x * blockDim.x;
         if(index < num){
-            atomicAdd(&diff, deltas_d[index]);
+            // atomicAdd(&diff, deltas_d[index]);
         }
     }
     __global__
     void is_converge(double threshold, int *flag_d){
-        // printf("diff is %.10f",diff);
-        // printf("thresh is %.10f",threshold);
+        printf("diff is %.10f",diff);
+        printf("thresh is %.15f",threshold);
         if(diff < threshold){
             diff = 0;
             flag_d[0] = 1;
@@ -46,13 +46,13 @@ namespace tjnpr_precompute{
             flag_d[0] = 0;
         }
     }
-    // __global__
-    // void clear(){
-    //     int index = threadIdx.x + blockIdx.x + blockDim.x;
-    //     if(index < num){
-    //         is_active_d[index] = false;
-    //     }
-    // }
+    __global__
+    void clear(){
+        int index = threadIdx.x + blockIdx.x * blockDim.x;
+        if(index < num){
+            is_active_d[index] = false;
+        }
+    }
     int compute(unsigned int num, double threshold){
         int *flag = (int *)malloc(sizeof(int));
         flag[0] = 0;
@@ -67,24 +67,30 @@ namespace tjnpr_precompute{
         is_converge<<<1, 1>>>(threshold, flag_d);
 
         cudaMemcpy(flag, flag_d, sizeof(int), cudaMemcpyDeviceToHost);
-        // clear<<<grid, block>>>();
-        return *flag;
+        clear<<<grid, block>>>();
+        return flag[0];
     }
 
     __device__
     void g_function(int index){
-        values_d[index] += deltas_d[index];
+        
+
+        float delta = atomicExch(&deltas_d[index], 0);
+        unsigned int out_degree = max(size_oes_d[index],1);
+        float outv = delta * 0.85f / out_degree;
+
         for(unsigned int i=cur_subgraph_d[index]; i < size_subgraph_d[index];i++){
             unsigned int dist_node = subgraph_neighbor_d[i];
-            float outv = deltas_d[index] * 0.85 / size_oes_d[index];
+            
             atomicAdd(&deltas_d[dist_node], outv);
         }
-        deltas_d[index] = 0;
+        atomicAdd(&values_d[index], delta);
+        atomicAdd(&diff, delta);
     }
 
     __global__
     void compute_real(){
-        int index = threadIdx.x + blockIdx.x + blockDim.x;
+        int index = threadIdx.x + blockIdx.x * blockDim.x;
         if(index < num){
             if(is_active_d[index]){
                 g_function(index);

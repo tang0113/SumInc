@@ -1109,7 +1109,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
             if(FLAGS_gpu_start){
               // cudaMemcpy(iboffset_h, iboffset_d, sizeof(vid_t) * ib_offsize, cudaMemcpyDeviceToHost);
               cudaMemcpy(cur_modified_size_h, cur_modified_size_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
-              tjnsssp::g_function_compr(cur_modified_size_h, cpr_->all_node_num);
+              tjnsssp::g_function_compr(cur_modified_size_h, num);
               cudaMemcpy(cur_modified_size_h, cur_modified_size_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
             }
             
@@ -2077,7 +2077,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
               // cudaMemcpy(ib_edata_d, ib_edata_h[cur_seg], sizeof(vid_t) * ib_average_edges, cudaMemcpyHostToDevice);
               // cudaMemcpy(is_edata_d, is_edata_h[cur_seg], sizeof(vid_t) * is_average_edges, cudaMemcpyHostToDevice);
 
-              tjnsssp_seg::g_function_compr(cpr_->all_node_num);
+              tjnsssp_seg::g_function_compr(num);
               cudaMemcpy(cur_modified_size_h, cur_modified_size_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
               LOG(INFO) << "cur size is "<<cur_modified_size_h[0];
               cur_seg++;
@@ -2090,7 +2090,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
         ForEach(app_->next_modified_, outer_vertices,
                 [&channels, vm_ptr, fid, this](int tid, vertex_t v) {
                   auto& delta_to_send = app_->deltas_[v];
-
+                  LOG(INFO) << "ues";
                   if (delta_to_send.value != app_->GetIdentityElement()) {
                     vid_t& v_parent_gid = delta_to_send.parent_gid;
                     fid_t v_fid = vm_ptr->GetFidFromGid(v_parent_gid);
@@ -2216,18 +2216,23 @@ class SumSyncTraversalWorker : public ParallelEngine {
                 first_step(values_temp, deltas_temp, exec_time, true);
                 //释放内存并且重新分配，size发生变化的变量需要重新分配
                 {
-                  // for(int i=0;i<FLAGS_seg_num;i++){
-                  //   free(isoffset_h[i]);
-                  //   free(iboffset_h[i]);
-                  //   free(is_edata_h[i]);
-                  //   free(ib_edata_h[i]);
-                  // }
-                  // free(isoffset_h);
-                  // free(iboffset_h);
-                  // free(is_eparent_h);
+                  for(int i=0;i<FLAGS_seg_num;i++){
+                    free(isoffset_h[i]);
+                    free(iboffset_h[i]);
+                    free(is_edata_h[i]);
+                    free(ib_edata_h[i]);
+                  }
+                  free(isoffset_h);
+                  free(iboffset_h);
+                  free(is_eparent_h);
 
-                  // cudaFree(isoffset_d);
-                  // cudaFree(is_edata_d);
+                  cudaFree(isoffset_d);
+                  cudaFree(is_edata_d);
+                  cudaFree(iboffset_d);
+                  cudaFree(ib_edata_d);
+                  cudaFree(is_eparent_d);
+
+
                 }
               }
               continue; // 已经将活跃点放入curr_modified_中了..
