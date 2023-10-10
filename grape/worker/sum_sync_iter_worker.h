@@ -2475,6 +2475,7 @@ class SumSyncIterWorker : public ParallelEngine {
                 check();
 
                 oeoffset = graph_->getOeoffset();
+                num = inner_vertices.end().GetValue() - inner_vertices.begin().GetValue();
                 oe_offsize = 0;//临时变量
                 max_oe_edges = 0;
                 for(int i = 0;i < num; i++){//Ingress

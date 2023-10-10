@@ -1287,10 +1287,10 @@ class SumSyncTraversalWorker : public ParallelEngine {
               deltas.buffer2fake();
               values.buffer2fake();
           }
-          for(int i = 0;i<100;i++){
-              vertex_t temp(i);
-              LOG(INFO) << "deltas  parent"<<i<<"is"<<deltas[temp].parent_gid;
-            }
+          // for(int i = 0;i<100;i++){
+          //     vertex_t temp(i);
+          //     LOG(INFO) << "deltas  parent"<<i<<"is"<<deltas[temp].parent_gid;
+          //   }
           if(compr_stage){
             LOG(INFO) << "start correct...";
             // check_result("correct before");
@@ -1967,7 +1967,9 @@ class SumSyncTraversalWorker : public ParallelEngine {
                       is_seg_start_d, is_seg_end_d, is_seg_end_edges_d, is_average_edges_d);
       
       int cur_seg = 0;
+      double timetemp = 0;
       while(true){
+        
         cur_seg = cur_seg % FLAGS_seg_num;
         LOG(INFO) << "step=" << step << " curr_modified_.size()=" << app_->curr_modified_.Count();
         exec_time -= GetCurrentTime();
@@ -2072,15 +2074,17 @@ class SumSyncTraversalWorker : public ParallelEngine {
                   });
             }
             if(FLAGS_gpu_start){
+              timetemp -= GetCurrentTime();
               cudaMemcpy(iboffset_d, iboffset_h[cur_seg], sizeof(vid_t) * ib_average_edges, cudaMemcpyHostToDevice);
               cudaMemcpy(isoffset_d, isoffset_h[cur_seg], sizeof(vid_t) * is_average_edges, cudaMemcpyHostToDevice);
-              // cudaMemcpy(ib_edata_d, ib_edata_h[cur_seg], sizeof(vid_t) * ib_average_edges, cudaMemcpyHostToDevice);
-              // cudaMemcpy(is_edata_d, is_edata_h[cur_seg], sizeof(vid_t) * is_average_edges, cudaMemcpyHostToDevice);
-
+              cudaMemcpy(ib_edata_d, ib_edata_h[cur_seg], sizeof(vid_t) * ib_average_edges, cudaMemcpyHostToDevice);
+              cudaMemcpy(is_edata_d, is_edata_h[cur_seg], sizeof(vid_t) * is_average_edges, cudaMemcpyHostToDevice);
+              
               tjnsssp_seg::g_function_compr(num);
               cudaMemcpy(cur_modified_size_h, cur_modified_size_d, sizeof(vid_t) * 1, cudaMemcpyDeviceToHost);
               LOG(INFO) << "cur size is "<<cur_modified_size_h[0];
               cur_seg++;
+              timetemp += GetCurrentTime();
             }
             
           }
@@ -2128,10 +2132,10 @@ class SumSyncTraversalWorker : public ParallelEngine {
                 deltas.buffer2fake();
                 values.buffer2fake();
             }
-            for(int i = 0;i<100;i++){
-              vertex_t temp(i);
-              LOG(INFO) << "deltas  parent "<<i<<"is"<<deltas[temp].parent_gid;
-            }
+            // for(int i = 0;i<100;i++){
+            //   vertex_t temp(i);
+            //   LOG(INFO) << "deltas  parent "<<i<<"is"<<deltas[temp].parent_gid;
+            // }
             if(compr_stage){
             LOG(INFO) << "start correct...";
             // check_result("correct before");
@@ -2222,8 +2226,6 @@ class SumSyncTraversalWorker : public ParallelEngine {
                     free(is_edata_h[i]);
                     free(ib_edata_h[i]);
                   }
-                  free(isoffset_h);
-                  free(iboffset_h);
                   free(is_eparent_h);
 
                   cudaFree(isoffset_d);
@@ -2231,8 +2233,219 @@ class SumSyncTraversalWorker : public ParallelEngine {
                   cudaFree(iboffset_d);
                   cudaFree(ib_edata_d);
                   cudaFree(is_eparent_d);
+                  num = fragment_->InnerVertices().size();
+                  ib_offsize = 0;
+                  for(int i = 0;i < num;i++){//SumInc
+                      cur_iboff_h[i] = ib_offsize;
+                      ib_offsize += ib_e_offset_[i+1] - ib_e_offset_[i];
+                      size_ib_h[i] = ib_e_offset_[i+1] - ib_e_offset_[i];
+                  }
+                  
+                  is_offsize = 0;
+                  for(int i=0;i < num;i++){
+                      cur_isoff_h[i] = is_offsize;
+                      is_offsize += is_e_offset_[i+1] - is_e_offset_[i];
+                      size_is_h[i] = is_e_offset_[i+1] - is_e_offset_[i];
+                  }
 
+                  ib_average_edges = (ib_offsize + FLAGS_seg_num - 1) / FLAGS_seg_num;
+                  is_average_edges = (is_offsize + FLAGS_seg_num - 1) / FLAGS_seg_num;
 
+                  for(int i=0;i<FLAGS_seg_num;i++){
+                    iboffset_h[i] = (vid_t *)malloc(sizeof(vid_t) * ib_average_edges);
+                    isoffset_h[i] = (vid_t *)malloc(sizeof(vid_t) * is_average_edges);
+                    ib_edata_h[i] = (value_t *)malloc(sizeof(value_t) * ib_average_edges);
+                    is_edata_h[i] = (value_t *)malloc(sizeof(value_t) * is_average_edges);
+                  }
+                  ib_edge_num = 0, is_edge_num = 0;//记录分段时的边,判断是否超出平均
+                  ib_cur_node = 0, is_cur_node = 0;//记录分段时的点遍历到何处
+
+                  for(int i=0;i<FLAGS_seg_num;i++){
+                    ib_seg_start[i] = ib_cur_node;
+                    is_seg_start[i] = is_cur_node;
+                    if(i!=0){
+                        if(ib_seg_end_edges[i-1] < size_ib_h[ib_seg_end[i-1]]){
+                            ib_edge_num += size_ib_h[ib_seg_end[i-1]] - ib_seg_end_edges[i-1];
+                            if(ib_edge_num < ib_average_edges){
+                                ib_cur_node++;
+                            }
+                        }
+                        if(is_seg_end_edges[i-1] < size_is_h[is_seg_end[i-1]]){
+                            is_edge_num += size_is_h[is_seg_end[i-1]] - is_seg_end_edges[i-1];
+                            if(is_edge_num < is_average_edges){
+                                is_cur_node++;
+                            }
+                        }
+                    }
+                    //边的分配
+                    while(ib_edge_num < ib_average_edges && ib_cur_node < num){
+                        ib_edge_num += size_ib_h[ib_cur_node];
+                        if(ib_edge_num >= ib_average_edges){
+                            break;
+                        }
+                        ib_cur_node++;
+                        if(ib_cur_node == num){
+                            break;
+                        }
+                    }
+                    while(is_edge_num < is_average_edges && is_cur_node < num){
+                        is_edge_num += size_is_h[is_cur_node];
+                        if(is_edge_num >= is_average_edges){
+                            break;
+                        }
+                        is_cur_node++;
+                        if(is_cur_node == num){
+                            break;
+                        }
+                    }
+
+                    //确定结束顶点
+                    if(ib_cur_node == num){
+                        ib_seg_end[i] = num - 1;
+                    }else{
+                        ib_seg_end[i] = ib_cur_node;
+                    }
+                    if(is_cur_node == num){
+                        is_seg_end[i] = num - 1;
+                    }else{
+                        is_seg_end[i] = is_cur_node;
+                    }
+
+                    //确定结束顶点分配的边数量
+                    if(ib_edge_num > ib_average_edges){
+                        ib_seg_end_edges[i] = size_ib_h[ib_seg_end[i]] - ib_edge_num + ib_average_edges;
+                    }else{
+                        ib_seg_end_edges[i] = size_ib_h[ib_seg_end[i]];
+                        ib_cur_node++;
+                    }
+                    if(is_edge_num > is_average_edges){
+                        is_seg_end_edges[i] = size_is_h[is_seg_end[i]] - is_edge_num + is_average_edges;
+                    }else{
+                        is_seg_end_edges[i] = size_is_h[is_seg_end[i]];
+                        is_cur_node++;
+                    }
+
+                    ib_edge_num = 0;
+                    is_edge_num = 0;
+                  }
+                  //邻居大列表,所有点的邻接表拼接而成
+                  cudaMalloc(&iboffset_d, sizeof(vid_t) * ib_average_edges);
+                  cudaMalloc(&isoffset_d, sizeof(vid_t) * is_average_edges);
+
+                  //边数据
+                  cudaMalloc(&ib_edata_d, sizeof(value_t) * ib_average_edges);
+                  cudaMalloc(&is_edata_d, sizeof(value_t) * is_average_edges);
+                  cudaMalloc(&is_eparent_d, sizeof(vid_t) * is_offsize);
+                  is_eparent_h = (vid_t *)malloc(sizeof(vid_t) * is_offsize);
+                  CurIndex = 0;
+                  for(int i=0;i<num;i++){
+                    for(int j=0;j < size_is_h[i];j++){
+                      is_eparent_h[CurIndex++] = is_e_offset_[i][j].data.parent_gid;
+                    }
+                  }
+                  for(int i=0;i<FLAGS_seg_num;i++){
+                    unsigned int ib_curIndex = 0, is_curIndex = 0;
+                    for(int j=ib_seg_start[i];j<ib_seg_end[i];j++){
+                        //分段之后有两种可能,一种是顶点所指向的边完全被分割,另一种是两段都有同一个点的邻居消息.
+                        if(j == ib_seg_start[i] && i!=0 && ib_seg_start[i] == ib_seg_end[i-1]){
+                            for(int k=ib_seg_end_edges[i-1]; k<size_ib_h[ib_seg_end[i-1]]; k++){
+                                value_t* temp = reinterpret_cast<value_t*>(&ib_e_offset_[j][k].data);//强制转换,原类型为empty不能直接用
+                                ib_edata_h[i][ib_curIndex] = *temp;
+                                iboffset_h[i][ib_curIndex++] = ib_e_offset_[j][k].neighbor.GetValue();
+                            }
+                        }else{
+                            for(int k=0;k<size_ib_h[j];k++){
+                                value_t* temp = reinterpret_cast<value_t*>(&ib_e_offset_[j][k].data);//强制转换,原类型为empty不能直接用
+                                ib_edata_h[i][ib_curIndex] = *temp;
+                                iboffset_h[i][ib_curIndex++] = ib_e_offset_[j][k].neighbor.GetValue();
+                            }
+                        }
+                    }
+                    //处理最后一个顶点,在极端情况下可能会出错,如一个顶点邻居数量特别多足以分两端,
+                    //此时k不应从0开始,且之前分段时设置的ib_seg_end_edges[i]也是错误的.
+                    //或者分段数量很多,导致一个顶点的边能分成两段,此时也易出错.
+                    for(int k=0;k<ib_seg_end_edges[i];k++){
+                        value_t* temp = reinterpret_cast<value_t*>(&ib_e_offset_[ib_seg_end[i]][k].data);//强制转换,原类型为empty不能直接用
+                        ib_edata_h[i][ib_curIndex] = *temp;
+                        iboffset_h[i][ib_curIndex++] = ib_e_offset_[ib_seg_end[i]][k].neighbor.GetValue();
+                    }
+
+                    for(int j=is_seg_start[i];j<is_seg_end[i];j++){
+                        //分段之后有两种可能,一种是顶点所指向的边完全被分割,另一种是两段都有同一个点的邻居消息.
+                        if(j == is_seg_start[i] && i!=0 && is_seg_start[i] == is_seg_end[i-1]){
+                            for(int k=is_seg_end_edges[i-1]; k<size_is_h[is_seg_end[i-1]]; k++){
+                                value_t* temp = reinterpret_cast<value_t*>(&is_e_offset_[j][k].data);//强制转换,原类型为empty不能直接用
+                                is_edata_h[i][is_curIndex] = *temp;
+                                isoffset_h[i][is_curIndex++] = is_e_offset_[j][k].neighbor.GetValue();
+                            }
+                        }else{
+                            for(int k=0;k<size_is_h[j];k++){
+                                value_t* temp = reinterpret_cast<value_t*>(&is_e_offset_[j][k].data);//强制转换,原类型为empty不能直接用
+                                is_edata_h[i][is_curIndex] = *temp;
+                                isoffset_h[i][is_curIndex++] = is_e_offset_[j][k].neighbor.GetValue();
+                            }
+                        }
+                    }
+                    
+                    for(int k=0;k<is_seg_end_edges[i];k++){
+                        value_t* temp = reinterpret_cast<value_t*>(&is_e_offset_[is_seg_end[i]][k].data);//强制转换,原类型为empty不能直接用
+                        is_edata_h[i][is_curIndex] = *temp;
+                        isoffset_h[i][is_curIndex++] = is_e_offset_[is_seg_end[i]][k].neighbor.GetValue();
+                    }
+                  }
+                  values.fake2buffer();
+                  deltas.fake2buffer();
+                  for(int i=0;i<(FLAGS_compress ? cpr_->all_node_num : num);i++){
+                      vertex_t temp(i);
+                      deltas_h[i] = deltas[temp].value;
+                      deltas_parent_h[i] = deltas[temp].parent_gid;
+                  }
+
+                  for(int i = 0; i < num; i++){
+                    node_type_h[i] = node_type[i];
+                  }
+                  cudaMemcpy(cur_iboff_d, cur_iboff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+                  cudaMemcpy(cur_isoff_d, cur_isoff_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+
+                  cudaMemcpy(deltas_d, deltas_h, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
+                  cudaMemcpy(deltas_parent_d, deltas_parent_h, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
+                  cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
+
+                  cudaMemcpy(size_ib_d, size_ib_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+                  cudaMemcpy(size_is_d, size_is_h, sizeof(vid_t) * num, cudaMemcpyHostToDevice);
+                  cudaMemcpy(is_eparent_d, is_eparent_h, sizeof(vid_t) * is_offsize, cudaMemcpyHostToDevice);
+                  check();
+                  for(auto v:fragment_->InnerVertices()){
+                    if(app_->curr_modified_.Exist(v)){
+                      last_modified_h[v.GetValue()] = 1;
+                      break;
+                    }
+                  }
+                  ib_average_edges_h[0] = ib_average_edges;
+                  is_average_edges_h[0] = is_average_edges;
+                  seg_num_h[0] = FLAGS_seg_num;
+                  cudaMemcpy(ib_seg_start_d, ib_seg_start, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
+                  cudaMemcpy(ib_seg_end_d, ib_seg_end, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
+                  cudaMemcpy(ib_seg_end_edges_d, ib_seg_end_edges, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
+                  
+                  cudaMemcpy(is_seg_start_d, is_seg_start, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
+                  cudaMemcpy(is_seg_end_d, is_seg_end, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
+                  cudaMemcpy(is_seg_end_edges_d, is_seg_end_edges, sizeof(vid_t) * FLAGS_seg_num, cudaMemcpyHostToDevice);
+
+                  cudaMemcpy(seg_num_d, seg_num_h, sizeof(vid_t) * 1, cudaMemcpyHostToDevice);
+                  cudaMemcpy(ib_average_edges_d, ib_average_edges_h, sizeof(vid_t) * 1, cudaMemcpyHostToDevice);
+                  cudaMemcpy(is_average_edges_d, is_average_edges_h, sizeof(vid_t) * 1, cudaMemcpyHostToDevice);
+                  cudaMemcpy(node_type_d, node_type_h, sizeof(char) * num, cudaMemcpyHostToDevice);
+                  cudaMemcpy(last_modified_d, last_modified_h, sizeof(int) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
+                  tjnsssp_seg::init(deltas_d, values_d, sssp_source, deltas_parent_d, 
+                      cur_modified_size_d, is_modified_d, last_modified_d, (FLAGS_compress ? cpr_->all_node_num : num),
+                      iboffset_d, ib_edata_d, cur_iboff_d, size_ib_d, 
+                      isoffset_d, is_edata_d, cur_isoff_d, size_is_d, is_eparent_d, 
+                      node_type_d, cur_seg_d, seg_num_d, 
+                      ib_seg_start_d, ib_seg_end_d, ib_seg_end_edges_d, ib_average_edges_d, 
+                      is_seg_start_d, is_seg_end_d, is_seg_end_edges_d, is_average_edges_d);
+
+                  
                 }
               }
               continue; // 已经将活跃点放入curr_modified_中了..
@@ -2262,6 +2475,7 @@ class SumSyncTraversalWorker : public ParallelEngine {
 
         app_->next_modified_.Swap(app_->curr_modified_); // 针对Ingress做动态时, 用这个 
       }
+      LOG(INFO) <<"time is "<<timetemp;
       free(size_ib_h);
       free(size_is_h);
 
