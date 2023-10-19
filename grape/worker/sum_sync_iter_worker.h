@@ -573,7 +573,7 @@ class SumSyncIterWorker : public ParallelEngine {
     if(!FLAGS_segment){
       double time = 0;
       auto oeoffset = graph_->getOeoffset();//用于Ingress
-
+      LOG(INFO) << "ingress?";
       vid_t num = inner_vertices.end().GetValue() - inner_vertices.begin().GetValue();
       LOG(INFO) <<"num is "<<num << " cpr num is "<< cpr_->all_node_num;
       vid_t *size_oe_d, *size_oe_h = (vid_t *)malloc(sizeof(vid_t) * num);//Ingress,用于记录每一个顶点的邻居数
@@ -908,6 +908,12 @@ class SumSyncIterWorker : public ParallelEngine {
               //   priority = Scheduled(1000);
               // }
               if(1){
+                // float deltasum = 0;
+                // for(int i=0;i<inner_vertices.size();i++){
+                //     vertex_t v(i);
+                //     deltasum += deltas[v];
+                // }
+                // LOG(INFO) << "delta sum is "<<deltasum;
                 if(gpu_start){
                   // values.fake2buffer();
                   // deltas.fake2buffer();
@@ -1134,6 +1140,7 @@ class SumSyncIterWorker : public ParallelEngine {
                 // spnode_datas.buffer2fake();
                 // bound_node_values.buffer2fake();
                 delta_sum = tjn::deltaSum(inner_vertices.begin().GetValue(), inner_vertices.end().GetValue());
+                check();
                 LOG(INFO) << "delta_sum is "<<delta_sum;
                 cudaDeviceSynchronize();
               }
@@ -1351,6 +1358,7 @@ class SumSyncIterWorker : public ParallelEngine {
         messages_.FinishARound();
 
         exec_time += GetCurrentTime();
+        LOG(INFO) << "exec_time : "<<exec_time<<" step : "<<step;
         #ifdef DEBUG
           LOG(INFO) << "step=" << step << " one_step_time=" << (GetCurrentTime() - one_step_time);
           LOG(INFO) << "time_sum_0=" << time_sum_0 << " ave_time=" << (time_sum_0/step);
@@ -1518,7 +1526,15 @@ class SumSyncIterWorker : public ParallelEngine {
               // cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * num, cudaMemcpyHostToDevice);
               if(compr_stage){
                 first_step(true);  // inc is true
-                
+                values = app_->values_;
+                deltas = app_->deltas_;
+                float delta_sum = 0;
+                for(int i=0;i<deltas.size();i++){
+                    vertex_t v(i);
+                    delta_sum += deltas[v];
+                }
+                LOG(INFO) << "delta sum is "<<delta_sum;
+                cudaSetDevice(0);
                 free(oeoffset_h);
                 free(iboffset_h);
                 free(isoffset_h);
@@ -1660,6 +1676,12 @@ class SumSyncIterWorker : public ParallelEngine {
                           node_type_d, is_edata_d, 
                           all_out_mirror_d, mirrorid2vid_d); 
               }
+              float delta_sum = 0;
+                for(int i=0;i<deltas.size();i++){
+                    vertex_t v(i);
+                    delta_sum += deltas[v];
+                }
+                LOG(INFO) << "delta sum is "<<delta_sum;
               continue;
             }
           } else {
@@ -1977,11 +1999,12 @@ class SumSyncIterWorker : public ParallelEngine {
       cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
       cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
       cudaMemcpy(spnode_datas_d, spnode_datas.data_buffer, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
-
+      check();
       cudaMemcpy(oe_edges_d, oe_edges, sizeof(vid_t)*FLAGS_seg_num, cudaMemcpyHostToDevice);
       cudaMemcpy(ib_edges_d, ib_edges, sizeof(vid_t)*FLAGS_seg_num, cudaMemcpyHostToDevice);
       cudaMemcpy(is_edges_d, is_edges, sizeof(vid_t)*FLAGS_seg_num, cudaMemcpyHostToDevice);
       cudaMemcpy(sync_edges_d, sync_edges, sizeof(vid_t)*FLAGS_seg_num, cudaMemcpyHostToDevice);
+      check();
       int cur_seg = 0;
       tjnpr_seg::init(spnode_datas_d, bound_node_values_d, deltas_d, values_d, 
                       oeoffset_d, iboffset_d, isoffset_d, syncoffset_d, 
@@ -1992,8 +2015,21 @@ class SumSyncIterWorker : public ParallelEngine {
                       all_out_mirror_d, mirrorid2vid_d, 
                       oe_edges_d, ib_edges_d, is_edges_d, sync_edges_d);
       value_t delta_sum = 1;
+      float deltasum = 0;
+      for(int i=0;i<deltas.size();i++){
+          vertex_t v(i);
+          deltasum += deltas[v];
+      }
+      LOG(INFO) <<"oe size is "<<oe_offsize;
+      LOG(INFO) <<"is size is "<<is_offsize;
+      LOG(INFO) <<"ib size is "<<ib_offsize;
+      LOG(INFO) <<"sync size is "<<sync_offsize;  
+      LOG(INFO) << "delta sum is "<<deltasum;
+      double timetrans = 0;
+      int curCompute = 0;//每段计算2轮,curCompute为奇数表示第一轮
       while(true){
         ++step;
+        curCompute++;
         exec_time -= GetCurrentTime();
         #ifdef DEBUG
           one_step_time = GetCurrentTime();
@@ -2067,14 +2103,18 @@ class SumSyncIterWorker : public ParallelEngine {
               }
 
               if(FLAGS_gpu_start){
-                cudaMemcpy(oeoffset_d, oeoffset_h[cur_seg], sizeof(vid_t) * oe_edges[cur_seg], cudaMemcpyHostToDevice);
+                if(curCompute % 2 != 0){
+                  timetrans -= GetCurrentTime();
+                  cudaMemcpy(oeoffset_d, oeoffset_h[cur_seg], sizeof(vid_t) * oe_edges[cur_seg], cudaMemcpyHostToDevice);
+                  timetrans += GetCurrentTime();
+                  cur_seg++;
+                  cur_seg %= FLAGS_seg_num;
+                }
                 tjnpr_seg::g_function_pr(num);
                 cudaDeviceSynchronize();
                 delta_sum = tjnpr_seg::deltaSum(inner_vertices.begin().GetValue(), inner_vertices.end().GetValue());
                 LOG(INFO) << "delta_sum is "<<delta_sum;
                 cudaDeviceSynchronize();
-                cur_seg++;
-                cur_seg %= FLAGS_seg_num;
               }
               #ifdef DEBUG
                 send_time_0 += GetCurrentTime();
@@ -2250,17 +2290,24 @@ class SumSyncIterWorker : public ParallelEngine {
                   }
               }
               if(FLAGS_gpu_start){
-                cudaMemcpy(oeoffset_d, oeoffset_h[cur_seg], sizeof(vid_t) * oe_edges[cur_seg], cudaMemcpyHostToDevice);
-                cudaMemcpy(iboffset_d, iboffset_h[cur_seg], sizeof(vid_t) * ib_edges[cur_seg], cudaMemcpyHostToDevice);
-                cudaMemcpy(isoffset_d, isoffset_h[cur_seg], sizeof(vid_t) * is_edges[cur_seg], cudaMemcpyHostToDevice);
-                cudaMemcpy(syncoffset_d, syncoffset_h[cur_seg], sizeof(vid_t) * sync_edges[cur_seg], cudaMemcpyHostToDevice);
-                cudaMemcpy(is_edata_d, is_edata_h[cur_seg], sizeof(vid_t) * is_edges[cur_seg], cudaMemcpyHostToDevice);
+                
+                if(curCompute % 2 != 0){
+                  timetrans -= GetCurrentTime();
+                  // cudaMemcpy(oeoffset_d, oeoffset_h[cur_seg], sizeof(vid_t) * oe_edges[cur_seg], cudaMemcpyHostToDevice);
+                  cudaMemcpy(iboffset_d, iboffset_h[cur_seg], sizeof(vid_t) * ib_edges[cur_seg], cudaMemcpyHostToDevice);
+                  cudaMemcpy(isoffset_d, isoffset_h[cur_seg], sizeof(vid_t) * is_edges[cur_seg], cudaMemcpyHostToDevice);
+                  cudaMemcpy(syncoffset_d, syncoffset_h[cur_seg], sizeof(vid_t) * sync_edges[cur_seg], cudaMemcpyHostToDevice);
+                  cudaMemcpy(is_edata_d, is_edata_h[cur_seg], sizeof(vid_t) * is_edges[cur_seg], cudaMemcpyHostToDevice);
+                  timetrans += GetCurrentTime();
+                  cur_seg++;
+                  cur_seg %= FLAGS_seg_num;
+                }
                 // check();
+                
                 tjnpr_seg::g_function_compr(num, isoffset_all_d, isdata_all_d);
                 // check();
                 cudaDeviceSynchronize();
-                cur_seg++;
-                cur_seg %= FLAGS_seg_num;
+                check();
               }
               if(!FLAGS_gpu_start){
                 vid_t size = cpr_->all_out_mirror.size();
@@ -2332,6 +2379,7 @@ class SumSyncIterWorker : public ParallelEngine {
         messages_.FinishARound();
 
         exec_time += GetCurrentTime();
+        LOG(INFO) << "exec_time : "<<exec_time<<" step : "<<step;
         #ifdef DEBUG
           LOG(INFO) << "step=" << step << " one_step_time=" << (GetCurrentTime() - one_step_time);
           LOG(INFO) << "time_sum_0=" << time_sum_0 << " ave_time=" << (time_sum_0/step);
@@ -2344,6 +2392,8 @@ class SumSyncIterWorker : public ParallelEngine {
 
         if((!FLAGS_gpu_start && termCheck(last_values, values, compr_stage)) || (FLAGS_gpu_start && delta_sum < FLAGS_termcheck_threshold) || step > FLAGS_pr_mr){
           app_->touch_nodes.clear();
+          LOG(INFO) << "trans time is "<<timetrans;
+          timetrans = 0;
           if(FLAGS_gpu_start){
             deltas.fake2buffer();
             values.fake2buffer();
@@ -2403,6 +2453,7 @@ class SumSyncIterWorker : public ParallelEngine {
             cudaMemcpy(bound_node_values_d, bound_node_values.data_buffer, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num), cudaMemcpyHostToDevice);
             // check();
             cur_seg = 0;
+            curCompute = 0;
             continue;//这里continue之后又使用ingress阶段算法
           }
           if (batch_stage){
@@ -2416,6 +2467,7 @@ class SumSyncIterWorker : public ParallelEngine {
             corr_time = 0;
             step = 0;
             cur_seg = 0;
+            curCompute = 0;
             convergence_id = 0;
 
             if (!FLAGS_efile_update.empty()){
@@ -2436,6 +2488,7 @@ class SumSyncIterWorker : public ParallelEngine {
               deltas = app_->deltas_;
               if(compr_stage){
                 first_step(true);
+                cudaSetDevice(0);
                 for(int i=0;i<FLAGS_seg_num;i++){
                   free(isoffset_h[i]);
                   free(iboffset_h[i]);

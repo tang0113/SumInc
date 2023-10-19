@@ -3212,7 +3212,7 @@ class CompressorBase : public ParallelEngine{
             std::set<vertex_t> P;
             for(int i = 0; i < size; i++){
                 inFile >> v_oid;
-                CHECK_GE(max_v_id, v_oid);
+                // CHECK_GE(max_v_id, v_oid);
                 CHECK(vm_ptr->GetGid(v_oid, v_gid));
                 fid_t v_fid = vm_ptr->GetFidFromGid(v_gid);
                 if (v_fid == fid) {

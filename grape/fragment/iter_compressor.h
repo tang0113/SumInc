@@ -92,6 +92,7 @@ class IterCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
 
         /* calculate index for each structure */
         timer_next("calculate index");
+        LOG(INFO) << "supernode num is "<<this->supernodes_num;
         double calculate_index = GetCurrentTime();
         {
             // /* parallel */
@@ -105,6 +106,7 @@ class IterCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
                 while(i < this->supernodes_num){
                     // i = __sync_fetch_and_add(&spnode_id, step);
                     i = spnode_id.fetch_add(step);
+                    if(i%10000 == 0)LOG(INFO) << "i is" << i;
                     for(int j = i; j < i + step; j++){
                         if(j < this->supernodes_num){
                             build_iter_index_mirror(j, this->graph_, tid);
@@ -563,17 +565,22 @@ class IterCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
             /* internal iteration */
             value_t *deltas_d;
             value_t *values_d;
-            cudaSetDevice(0);
+            cudaSetDevice(1);
             // LOG(INFO) << "oes size is "<<this->old_node_num;
             // LOG(INFO) << "all node num is "<<this->all_node_num;
             cudaMalloc(&deltas_d, sizeof(value_t) * this->all_node_num);
             cudaMalloc(&values_d, sizeof(value_t) * this->all_node_num);
             values.fake2buffer();
             deltas.fake2buffer();
+            cudaError_t err = cudaGetLastError();
+            printf("cudaFunction values1:%s\n",cudaGetErrorString(err));
+            
             LOG(INFO) << "all node num is "<<this->all_node_num;
             LOG(INFO) << "oes num is "<<this->old_node_num;
             cudaMemcpy(deltas_d, deltas.data_buffer, sizeof(value_t) * this->all_node_num, cudaMemcpyHostToDevice);
             cudaMemcpy(values_d, values.data_buffer, sizeof(value_t) * this->all_node_num, cudaMemcpyHostToDevice);
+            err = cudaGetLastError();
+            printf("cudaFunction values2:%s\n",cudaGetErrorString(err));
             vid_t *size_subgraph_d, *size_subgraph_h = (vid_t *)malloc(sizeof(vid_t) * this->all_node_num);
             vid_t *size_oes_d, *size_oes_h = (vid_t *)malloc(sizeof(vid_t) * this->old_node_num);
             vid_t *cur_subgraph_d, *cur_subgraph_h = (vid_t *)malloc(sizeof(vid_t) * this->all_node_num);
@@ -588,6 +595,7 @@ class IterCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
                 vertex_t v(i);
                 size_oes_h[i] = this->graph_->GetOutgoingAdjList(v).Size();
             }
+            LOG(INFO) << "sub offsize is "<<subgraph_offsize;
             vid_t *subgraph_neighbor_d, *subgraph_neighbor_h = (vid_t *)malloc(sizeof(vid_t) * subgraph_offsize);
             unsigned int subgraph_curIndex = 0;
             for(int i=0;i<this->all_node_num;i++){
@@ -599,23 +607,56 @@ class IterCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
             }
             bool *is_active_d, *is_active_h = (bool *)malloc(sizeof(bool) * this->old_node_num);
             cudaMalloc(&is_active_d, sizeof(bool) * this->old_node_num);
-            cudaMalloc(&size_oes_d, sizeof(vid_t) * this->old_node_num);
-            cudaMalloc(&size_subgraph_d, sizeof(vid_t) * this->all_node_num);
-            cudaMalloc(&cur_subgraph_d, sizeof(vid_t) * this->all_node_num);
-            cudaMalloc(&subgraph_neighbor_d, sizeof(vid_t) * subgraph_offsize);
+            err = cudaGetLastError();
+            printf("cudaFunction isactive:%s\n",cudaGetErrorString(err));
             
+            cudaMalloc(&size_oes_d, sizeof(vid_t) * this->old_node_num);
+            err = cudaGetLastError();
+            printf("cudaFunction sizeoes:%s\n",cudaGetErrorString(err));
+            
+            cudaMalloc(&size_subgraph_d, sizeof(vid_t) * this->all_node_num);
+            err = cudaGetLastError();
+            printf("cudaFunction sizesub:%s\n",cudaGetErrorString(err));
+            
+            cudaMalloc(&cur_subgraph_d, sizeof(vid_t) * this->all_node_num);
+            err = cudaGetLastError();
+            printf("cudaFunction cursub:%s\n",cudaGetErrorString(err));
+            
+            cudaMalloc(&subgraph_neighbor_d, sizeof(vid_t) * subgraph_offsize);
+            err = cudaGetLastError();
+            printf("cudaFunction subnei:%s\n",cudaGetErrorString(err));
+
             cudaMemcpy(size_oes_d, size_oes_h, sizeof(vid_t) * this->old_node_num, cudaMemcpyHostToDevice);
+            err = cudaGetLastError();
+            printf("cudaFunction sizeoes2:%s\n",cudaGetErrorString(err));
+
             cudaMemcpy(size_subgraph_d, size_subgraph_h, sizeof(vid_t) * this->all_node_num, cudaMemcpyHostToDevice);
+            err = cudaGetLastError();
+            printf("cudaFunction sizesub2:%s\n",cudaGetErrorString(err));
+
             cudaMemcpy(cur_subgraph_d, cur_subgraph_h, sizeof(vid_t) * this->all_node_num, cudaMemcpyHostToDevice);
+            err = cudaGetLastError();
+            printf("cudaFunction cursub2:%s\n",cudaGetErrorString(err));
+
             cudaMemcpy(subgraph_neighbor_d, subgraph_neighbor_h, sizeof(vid_t) * subgraph_offsize, cudaMemcpyHostToDevice);
+            err = cudaGetLastError();
+            printf("cudaFunction subnei2:%s\n",cudaGetErrorString(err));
+
             check();
             tjnpr_precompute::init_subgraph(deltas_d, values_d, size_oes_d, size_subgraph_d, cur_subgraph_d, subgraph_neighbor_d, this->old_node_num, is_active_d);
             size_t update_ids_num = this->update_cluster_ids.size();
             bool convergence = false;
+            LOG(INFO) << "this old num is "<<this->old_node_num;
+            LOG(INFO) << "this all num is "<<this->all_node_num;
+            LOG(INFO) << "deltas size is "<<deltas.size();
+            double updateTime = 0;
+            int allsize = 0;
             for(vid_t j = 0; j < update_ids_num; j++){
                 vid_t ids_id = this->update_cluster_ids[j];
                 if(!FLAGS_gpu_start){
+                    updateTime -= GetCurrentTime();
                     run_to_convergence_for_precpt(ids_id);
+                    updateTime += GetCurrentTime();
                 }
                 if(FLAGS_gpu_start){
                     convergence = false;
@@ -623,16 +664,36 @@ class IterCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
                     for(auto v : node_set){
                         is_active_h[v.GetValue()] = true;
                     }
-                    double threshold = FLAGS_termcheck_threshold / this->old_node_num * this->supernode_ids[ids_id].size();
-                    while(!convergence){
-                        cudaMemcpy(is_active_d, is_active_h, sizeof(bool) * this->old_node_num, cudaMemcpyHostToDevice);
-                        convergence = tjnpr_precompute::compute(this->old_node_num, threshold);
-                        check();
-                        // LOG(INFO) << "convergence is "<<convergence;
-                        // cudaMemcpy(is_active_h, is_active_d, sizeof(bool) * this->old_node_num, cudaMemcpyDeviceToHost);
-                    }
+                    allsize += node_set.size();
+                    // double threshold = FLAGS_termcheck_threshold / this->old_node_num * this->supernode_ids[ids_id].size();
                 }
             }
+            int step = 0;
+            cudaMemcpy(is_active_d, is_active_h, sizeof(bool) * this->old_node_num, cudaMemcpyHostToDevice);
+            double threshold = FLAGS_termcheck_threshold / this->old_node_num * allsize;
+            if(FLAGS_gpu_start){
+                while(!convergence){
+                    step++;
+                    updateTime -= GetCurrentTime();
+                    convergence = tjnpr_precompute::compute(this->old_node_num, threshold);
+                    updateTime += GetCurrentTime();
+                    // check();
+                    // LOG(INFO) << "convergence is "<<convergence;
+                    // cudaMemcpy(is_active_h, is_active_d, sizeof(bool) * this->old_node_num, cudaMemcpyDeviceToHost);
+                }
+            }
+            LOG(INFO) <<"step is "<<step;
+            LOG(INFO) << "update time is "<<updateTime;
+            deltas.fake2buffer();
+            values.fake2buffer();
+            cudaMemcpy(deltas.data_buffer, deltas_d, sizeof(value_t) * this->all_node_num, cudaMemcpyDeviceToHost);
+            cudaMemcpy(values.data_buffer, values_d, sizeof(value_t) * this->all_node_num, cudaMemcpyDeviceToHost);
+            float delta_sum = 0;
+            for(int i=0;i<deltas.size();i++){
+                vertex_t v(i);
+                delta_sum += deltas[v];
+            }
+            LOG(INFO) << "delta sum is "<<delta_sum;
             cudaFree(deltas_d);
             cudaFree(values_d);
 
@@ -672,25 +733,34 @@ class IterCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
         // double threshold_full = supernode_termcheck_threshold_2  * node_set_size;
         double threshold_full = FLAGS_termcheck_threshold / this->old_node_num 
                                 * node_set_size;
-
+        // LOG(INFO) <<"threshold is "<<threshold_full;
+        double timex = GetCurrentTime();
         while (true) {
+            
             step++;
             Diff = 0;
             // receive & send
             for(auto v : node_set){
                 auto to_send = deltas[v];
+                int de = this->graph_->GetOutgoingAdjList(v).Size();
+                // if(de == 0)LOG(INFO) << "why";
                 if(to_send != this->app_->default_v()){
+                    int de = this->graph_->GetOutgoingAdjList(v).Size();
+                    // if(de == 0)LOG(INFO) << "why2";
                     auto last_value = values[v];
                     deltas[v] = this->app_->default_v();
                     auto& value = values[v];
                     const auto& oes = this->graph_->GetOutgoingAdjList(v);
+                    // if(oes.Size()==0)LOG(INFO) <<"why3";
                     /* inner edges */
                     const auto& inner_oes = this->subgraph[v.GetValue()];
+                    // if(de==0)LOG(INFO)<<inner_oes.size()<<"why5"; 
                     #ifdef COUNT_ACTIVE_EDGE_NUM
                       atomic_add(this->app_->f_index_count_num, (long long)inner_oes.size());
                     #endif
                     for(auto e : inner_oes){
                         value_t outv = 0;
+                        // if(de==0)LOG(INFO) << "why4";
                         this->app_->g_function(*(this->graph_), v, value, to_send, oes, e, outv);
                         this->app_->accumulate(deltas[e.neighbor], outv); // inner nodes
                     }
@@ -708,6 +778,9 @@ class IterCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
                 break;
             }
         }
+        timex = GetCurrentTime() - timex;
+        // LOG(INFO) <<"time is "<<timex;
+        // LOG(INFO) << "step is "<<step;
         // LOG(INFO) << "step is "<<step;
     }
 

@@ -40,6 +40,7 @@ namespace tjnpr_seg{
     __device__ unsigned int *sync_edges_d;
 
     __device__ unsigned int *isoffset_all_d;
+    __device__ int curCompute;
 
     enum NodeType {
         SingleNode = 0,
@@ -106,13 +107,15 @@ namespace tjnpr_seg{
         tjnpr_seg::num = num;
         tjnpr_seg::oe_average_nodes = oe_average_nodes;
         tjnpr_seg::is_average_nodes = is_average_nodes;
-        tjnpr_seg::cur_seg = cur_seg;
+        tjnpr_seg::cur_seg = 0;
         tjnpr_seg::seg_num = seg_num;
 
         tjnpr_seg::oe_edges_d = oe_edges_d;
         tjnpr_seg::ib_edges_d = ib_edges_d;
         tjnpr_seg::is_edges_d = is_edges_d;
         tjnpr_seg::sync_edges_d = sync_edges_d;
+
+        tjnpr_seg::curCompute = 0;
 
         // tjnpr_seg::isoffset_all_d = isoffset_all_d;
     }
@@ -122,7 +125,7 @@ namespace tjnpr_seg{
         // printf("tjn");
         int index = threadIdx.x + blockIdx.x * blockDim.x;
         if(index < num){
-            atomicAdd(&result_d[0], deltas_d[index]);
+            atomicAdd(&result_d[0], std::fabs(deltas_d[index]));
         }
     }
     float deltaSum(unsigned int start, unsigned int end){
@@ -154,8 +157,12 @@ namespace tjnpr_seg{
     }
     __global__
     void cursegChange(){
-        cur_seg++;
-        cur_seg %= seg_num;
+        curCompute++;
+        if(curCompute % 2 == 0){
+            cur_seg++;
+            cur_seg %= seg_num;
+        }
+        curCompute %= 2;
     }
     void g_function_pr(unsigned int num){
         dim3 block(512);
@@ -211,6 +218,8 @@ namespace tjnpr_seg{
         dim3 block(512);
         dim3 grid( (num-1) / block.x + 1);
         g_function_compr_real<<<grid, block>>>(isoffset_all_d, isdata_all_d);
+        // cudaError_t err = cudaGetLastError();
+        // printf("cudaFunction_gfunc:%s\n",cudaGetErrorString(err));
         cursegChange<<<1,1>>>();
     }
     
@@ -228,6 +237,8 @@ namespace tjnpr_seg{
         dim3 block(512);
         dim3 grid((size - 1) / block.x + 1);
         OutMirrorSyncToMaster_real<<<grid, block>>>(size);
+        // cudaError_t err = cudaGetLastError();
+        // printf("cudaFunctionout:%s\n",cudaGetErrorString(err));
     }
     __device__
     bool isChange_pr(float delta, int verticesNum){
@@ -317,7 +328,7 @@ namespace tjnpr_seg{
         }else if(isChange_pr(bound_node_values_d[index], num)){
             int pre_edges = 0;
             for(int i=0;i<cur_seg;i++){
-                pre_edges += is_edges_d[i];
+                pre_edges += ib_edges_d[i];
             }
             atomicAdd(&values_d[index], bound_node_values_d[index]);
             float delta = atomicExch(&bound_node_values_d[index], 0);

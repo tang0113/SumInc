@@ -35,16 +35,10 @@ namespace tjnpr_precompute{
     }
     __global__
     void is_converge(double threshold, int *flag_d){
-        printf("diff is %.10f",diff);
-        printf("thresh is %.15f",threshold);
-        if(diff < threshold){
-            diff = 0;
-            flag_d[0] = 1;
-            
-        }else{
-            diff = 0;
-            flag_d[0] = 0;
-        }
+        // printf("diff is %.10f",diff);
+        // printf("thresh is %.15f\n",threshold);
+        flag_d[0] = diff < threshold ? 1 : 0;
+        diff = 0;
     }
     __global__
     void clear(){
@@ -54,20 +48,35 @@ namespace tjnpr_precompute{
         }
     }
     int compute(unsigned int num, double threshold){
+        
+
         int *flag = (int *)malloc(sizeof(int));
         flag[0] = 0;
         int *flag_d;
         cudaMalloc(&flag_d, sizeof(int));
         cudaMemcpy(flag_d, flag, sizeof(int), cudaMemcpyHostToDevice);
 
+        cudaEvent_t startCuda, stopCuda;  //declare
+        cudaEventCreate(&startCuda);      //set up 
+        cudaEventCreate(&stopCuda);       //set up
+        cudaEventRecord(startCuda,0);    //start
+
         dim3 block(512);
         dim3 grid((num - 1) / block.x + 1);
         compute_real<<<grid, block>>>();
-        delta_sum<<<grid, block>>>();
+        cudaEventRecord(stopCuda,0);     //finish
+        cudaEventSynchronize(stopCuda);
+        cudaDeviceSynchronize();
+        float eTime;
+        cudaEventElapsedTime(&eTime, startCuda, stopCuda);  
+        // printf("time is %f\n",eTime);
+
         is_converge<<<1, 1>>>(threshold, flag_d);
 
+        
+
         cudaMemcpy(flag, flag_d, sizeof(int), cudaMemcpyDeviceToHost);
-        clear<<<grid, block>>>();
+        // clear<<<grid, block>>>();
         return flag[0];
     }
 
@@ -75,17 +84,20 @@ namespace tjnpr_precompute{
     void g_function(int index){
         
 
-        float delta = atomicExch(&deltas_d[index], 0);
-        unsigned int out_degree = max(size_oes_d[index],1);
+        // float delta = atomicExch(&deltas_d[index], 0);
+        float delta = deltas_d[index];
+        deltas_d[index] = 0;
+        values_d[index] += delta;
+        atomicAdd(&diff, std::fabs(delta));
+        unsigned int out_degree = size_oes_d[index];
+        if(out_degree == 0 || delta == 0)return ;
         float outv = delta * 0.85f / out_degree;
-
-        for(unsigned int i=cur_subgraph_d[index]; i < size_subgraph_d[index];i++){
+        for(unsigned int i=cur_subgraph_d[index]; i < size_subgraph_d[index] + cur_subgraph_d[index];i++){
             unsigned int dist_node = subgraph_neighbor_d[i];
-            
             atomicAdd(&deltas_d[dist_node], outv);
         }
-        atomicAdd(&values_d[index], delta);
-        atomicAdd(&diff, delta);
+        // atomicAdd(&values_d[index], delta);
+        
     }
 
     __global__

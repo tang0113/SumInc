@@ -136,7 +136,12 @@ if (NOT GFLAGS_FOUND)
 else ()
     cuda_add_executable(ingress examples/analytical_apps/flags.cc
             examples/analytical_apps/ingress.cc
-            cudaCode/my_worker.cu)
+            cudaCode/my_worker.cu
+            cudaCode/my_ssspworker.cu
+            cudaCode/my_ssspworker_seg.cu
+            cudaCode/my_worker_seg.cu
+            cudaCode/my_ssspworker_precompute.cu
+            cudaCode/my_worker_precompute.cu)
     target_include_directories(ingress PRIVATE
             examples/analytical_apps)
     set_target_properties(ingress PROPERTIES OUTPUT_NAME ingress)

@@ -125,7 +125,7 @@ namespace tjn{
   void deltaSum_real(float *result_d){
     int index = threadIdx.x + blockIdx.x * blockDim.x;
     if(index < end_d - start_d){
-      atomicAdd(&result_d[0], deltas_d[index]);
+      atomicAdd(&result_d[0], std::fabs(deltas_d[index]));
     }
   }
   float deltaSum(unsigned int start, unsigned int end){
