@@ -665,7 +665,7 @@ class SumSyncIterWorker : public ParallelEngine {
       cudaMalloc(&bound_node_values_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num));
       cudaMalloc(&spnode_datas_d, sizeof(value_t) * (FLAGS_compress ? cpr_->all_node_num : num));
       check();
-      cudaMalloc(&oeoffset_d, sizeof(vid_t) * oe_offsize);
+      // cudaMalloc(&oeoffset_d, sizeof(vid_t) * oe_offsize);
       cudaMalloc(&iboffset_d, sizeof(vid_t) * ib_offsize);
       cudaMalloc(&isoffset_d, sizeof(vid_t) * is_offsize);
       cudaMalloc(&syncoffset_d, sizeof(vid_t) * sync_offsize);
@@ -749,7 +749,7 @@ class SumSyncIterWorker : public ParallelEngine {
       spnode_datas.fake2buffer();
       LOG(INFO) << "is size is "<<is_e_offset_.size();
       //将要用到的数据进行传输
-      cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * oe_offsize, cudaMemcpyHostToDevice);
+      // cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * oe_offsize, cudaMemcpyHostToDevice);
       cudaMemcpy(iboffset_d, iboffset_h, sizeof(vid_t) * ib_offsize, cudaMemcpyHostToDevice);
       cudaMemcpy(isoffset_d, isoffset_h, sizeof(vid_t) * is_offsize, cudaMemcpyHostToDevice);
       cudaMemcpy(syncoffset_d, syncoffset_h, sizeof(vid_t) * sync_offsize, cudaMemcpyHostToDevice);
@@ -884,8 +884,8 @@ class SumSyncIterWorker : public ParallelEngine {
               
               if(FLAGS_gpu_start){
                 // 一次传输
-                tjn::g_function_pr(inner_vertices.begin().GetValue(), inner_vertices.end().GetValue());
-                cudaDeviceSynchronize();
+                // tjn::g_function_pr(inner_vertices.begin().GetValue(), inner_vertices.end().GetValue());
+                // cudaDeviceSynchronize();
                 // check();
                 delta_sum = tjn::deltaSum(inner_vertices.begin().GetValue(), inner_vertices.end().GetValue());
                 LOG(INFO) << "delta_sum is "<<delta_sum;
@@ -1601,7 +1601,7 @@ class SumSyncIterWorker : public ParallelEngine {
                 iboffset_h = (vid_t *)malloc(sizeof(vid_t) * ib_offsize);
                 isoffset_h = (vid_t *)malloc(sizeof(vid_t) * is_offsize);
                 syncoffset_h = (vid_t *)malloc(sizeof(vid_t) * sync_offsize);
-                cudaMalloc(&oeoffset_d, sizeof(vid_t) * oe_offsize);
+                // cudaMalloc(&oeoffset_d, sizeof(vid_t) * oe_offsize);
                 cudaMalloc(&iboffset_d, sizeof(vid_t) * ib_offsize);
                 cudaMalloc(&isoffset_d, sizeof(vid_t) * is_offsize);
                 cudaMalloc(&syncoffset_d, sizeof(vid_t) * sync_offsize);
@@ -1642,7 +1642,7 @@ class SumSyncIterWorker : public ParallelEngine {
                 bound_node_values.fake2buffer();
                 spnode_datas.fake2buffer();
 
-                cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * oe_offsize, cudaMemcpyHostToDevice);
+                // cudaMemcpy(oeoffset_d, oeoffset_h, sizeof(vid_t) * oe_offsize, cudaMemcpyHostToDevice);
                 cudaMemcpy(iboffset_d, iboffset_h, sizeof(vid_t) * ib_offsize, cudaMemcpyHostToDevice);
                 cudaMemcpy(isoffset_d, isoffset_h, sizeof(vid_t) * is_offsize, cudaMemcpyHostToDevice);
                 cudaMemcpy(syncoffset_d, syncoffset_h, sizeof(vid_t) * sync_offsize, cudaMemcpyHostToDevice);

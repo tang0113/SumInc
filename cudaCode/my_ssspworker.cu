@@ -101,43 +101,65 @@ namespace tjnsssp{
         // cudaFree(tjnsssp::next_modified_size);
     }
 
+    __global__
+    void clearCurSize(){
+        cur_modified_size_d[0] = 0;
+    }
+
+    __global__
+    void setCurSize(){
+        int index = threadIdx.x + blockIdx.x * blockDim.x;
+        if(index < num && last_modified_d[index] != 0){
+            atomicAdd(&cur_modified_size_d[0], 1);
+        }
+    }
+
     void g_function(unsigned int *cur_modified_size_h, unsigned int num){
         dim3 block(512);
         dim3 grid((num - 1) / block.x + 1);
 
+        clearCurSize<<<1, 1>>>();
         // printf("cur modified size is %d", cur_modified_size_h[0]);
         g_function_real<<<grid, block>>>();
         
 
         cudaDeviceSynchronize();
+        setCurSize<<<grid, block>>>();
         // unsigned int *next_modified_size_h = (unsigned int *)malloc(sizeof(unsigned int) * 1);
         // unsigned int *next_modified_size_d; cudaMalloc(&next_modified_size_d, sizeof(unsigned int) * 1);
 
 
-        dim3 block1(512);
-        dim3 grid1((num-1) / block1.x + 1);
-        setNextSize<<<grid1, block1>>>();
-        cudaDeviceSynchronize();
+        // dim3 block1(512);
+        // dim3 grid1((num-1) / block1.x + 1);
+        // setNextSize<<<grid1, block1>>>();
+        // cudaDeviceSynchronize();
 
-        swap(num);
+        // swap(num);
 
-        clear(num);
+        // clear(num);
     }
+
+    
 
     void g_function_compr(unsigned int *cur_modified_size_h, unsigned int cpr_num){
         dim3 block(512);
         dim3 grid((cpr_num - 1) / block.x + 1);
+
+        clearCurSize<<<1, 1>>>();
+
         g_function_compr_real<<<grid, block>>>();
         cudaDeviceSynchronize();
 
-        dim3 block1(512);
-        dim3 grid1((cpr_num-1) / block1.x + 1);
-        setNextSize<<<grid1, block1>>>();
-        cudaDeviceSynchronize();
+        setCurSize<<<grid, block>>>();
 
-        swap(cpr_num);
+        // dim3 block1(512);
+        // dim3 grid1((cpr_num-1) / block1.x + 1);
+        // setNextSize<<<grid1, block1>>>();
+        // cudaDeviceSynchronize();
 
-        clear(cpr_num);
+        // swap(cpr_num);
+
+        // clear(cpr_num);
         // swap();
     }
 
@@ -180,6 +202,12 @@ namespace tjnsssp{
                             sssp_nodeTypeThree(index);
                             break;
                         }
+                    case 4:
+                        {
+                            last_modified_d[index] = 0;
+                            break;
+                        }
+                        
                 }
             }
             
@@ -348,6 +376,7 @@ namespace tjnsssp{
             return ;
         }
         else{
+            last_modified_d[index] = 0;
             unsigned int cur_modified_node = index;
             if(values_d[cur_modified_node] > deltas_d[cur_modified_node]){
                 values_d[cur_modified_node] = deltas_d[cur_modified_node];
@@ -361,7 +390,7 @@ namespace tjnsssp{
                     int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                     if(new_dist < deltas_d[dist_node]){
                         atomicMin(&deltas_d[dist_node], new_dist);
-                        atomicExch(&is_modified_d[dist_node], 1);
+                        atomicExch(&last_modified_d[dist_node], 1);
                     }
                 }
             }
@@ -374,6 +403,7 @@ namespace tjnsssp{
     __device__
     void sssp_nodeTypeZeroAndOne(int index){
         unsigned int cur_modified_node = index;
+        last_modified_d[index] = 0;
         if(values_d[cur_modified_node] > deltas_d[cur_modified_node]){
             values_d[cur_modified_node] = deltas_d[cur_modified_node];
             // atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
@@ -386,13 +416,10 @@ namespace tjnsssp{
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                 if(new_dist < deltas_d[dist_node]){
                     int old = atomicMin(&deltas_d[dist_node], new_dist);
-                    atomicExch(&is_modified_d[dist_node], 1);
+                    atomicExch(&last_modified_d[dist_node], 1);
                     unsigned int e_parent = cur_modified_node;
                     if(old > new_dist)
                         atomicExch(&deltas_parent_d[dist_node], e_parent);
-                    if(dist_node == 5){
-                        printf("5 1 is %d",cur_modified_node);
-                    }
                 }
             }
         }
@@ -401,6 +428,7 @@ namespace tjnsssp{
     __device__
     void sssp_nodeTypeTwo(int index){
         unsigned int cur_modified_node = index;
+        last_modified_d[index] = 0;
         if(values_d[cur_modified_node] > deltas_d[cur_modified_node]){
             values_d[cur_modified_node] = deltas_d[cur_modified_node];
             // atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
@@ -413,13 +441,10 @@ namespace tjnsssp{
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                 if(new_dist < deltas_d[dist_node]){
                     int old = atomicMin(&deltas_d[dist_node], new_dist);
-                    atomicExch(&is_modified_d[dist_node], 1);
+                    atomicExch(&last_modified_d[dist_node], 1);
                     unsigned int e_parent = is_eparent_d[i];
                     if(old > new_dist)
                         atomicExch(&deltas_parent_d[dist_node], e_parent);
-                    if(dist_node == 5){
-                        printf("5 2 is %d",is_eparent_d[dist_node]);
-                    }
                 }
             }
         }
@@ -428,6 +453,7 @@ namespace tjnsssp{
     __device__
     void sssp_nodeTypeThree(int index){
         unsigned int cur_modified_node = index;
+        last_modified_d[index] = 0;
         if(values_d[cur_modified_node] > deltas_d[cur_modified_node]){
             values_d[cur_modified_node] = deltas_d[cur_modified_node];
             // atomicExch(&values_d[cur_modified_node], deltas_d[cur_modified_node]);
@@ -439,19 +465,12 @@ namespace tjnsssp{
                 // }
                 // int new_dist = ib_edata_d[i] + deltas_d[cur_modified_node];//权重图
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
-                if(index == 104804 && dist_node == 5){
-                        printf("new dist is %d",new_dist);
-                        printf("deltas is %d",deltas_d[dist_node]);   
-                    }
                 if(new_dist < deltas_d[dist_node]){
                     int old = atomicMin(&deltas_d[dist_node], new_dist);
-                    atomicExch(&is_modified_d[dist_node], 1);
+                    atomicExch(&last_modified_d[dist_node], 1);
                     unsigned int e_parent = cur_modified_node;
                     if(old > new_dist)
                         atomicExch(&deltas_parent_d[dist_node], e_parent);
-                    if(dist_node == 5){
-                        printf("5 31 is %d",cur_modified_node);
-                    }
                 }
             }
             //第二阶段
@@ -464,13 +483,10 @@ namespace tjnsssp{
                 int new_dist = 1 + deltas_d[cur_modified_node];//无权测试
                 if(new_dist < deltas_d[dist_node]){
                     int old = atomicMin(&deltas_d[dist_node], new_dist);
-                    atomicExch(&is_modified_d[dist_node], 1);
+                    atomicExch(&last_modified_d[dist_node], 1);
                     unsigned int e_parent = is_eparent_d[i];
                     if(old > new_dist)
                         atomicExch(&deltas_parent_d[dist_node], e_parent);
-                    if(dist_node == 5){
-                        printf("5 32 is %d",is_eparent_d[dist_node]);
-                    }
                 }
             }
         }

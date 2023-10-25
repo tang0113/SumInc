@@ -733,7 +733,7 @@ class TravCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
     //         subgraph_neighbor_h[subgraph_curIndex++] = this->subgraph[i][j].neighbor.GetValue();
     //     }
     //   }
-      cudaSetDevice(0);
+      cudaSetDevice(1);
       cudaMalloc(&size_subgraph_d, sizeof(vid_t) * this->all_node_num);
       cudaMalloc(&cur_subgraph_d, sizeof(vid_t) * this->all_node_num);
       cudaMalloc(&subgraph_data_d, sizeof(value_t) * subgraph_offsize);
@@ -802,6 +802,7 @@ class TravCompressor : public CompressorBase <APP_T, SUPERNODE_T> {
         cudaMemcpy(modified_num_d, modified_num_h, sizeof(vid_t) * 1, cudaMemcpyHostToDevice);
         
         tjnsssp_precompute::init_modified(modified_d, deltas_d, deltas_parent_d, values_d, modified_num_d);
+        check();
         int step = 0;
         while(modified_num_h[0] && step < 50){
             step++;

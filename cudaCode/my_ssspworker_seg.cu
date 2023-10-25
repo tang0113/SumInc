@@ -130,6 +130,8 @@ namespace tjnsssp_seg{
         cudaDeviceSynchronize();
 
         setCurSize<<<grid, block>>>();
+        printf("yes");
+
         cudaDeviceSynchronize();
 
         setCurSeg<<<1, 1>>>();
@@ -193,6 +195,11 @@ namespace tjnsssp_seg{
                     case 3:
                         {
                             sssp_nodeTypeThree(index);
+                            break;
+                        }
+                    default:
+                        {
+                            last_modified_d[index] = 0;
                             break;
                         }
                 }
@@ -431,6 +438,9 @@ namespace tjnsssp_seg{
         int index = threadIdx.x + blockIdx.x * blockDim.x;
         if(index < num && last_modified_d[index] > 0){
             atomicAdd(&cur_modified_size_d[0], 1);
+            if(node_type_d[index] == 4)printf("444");
+            // printf("type is %d",node_type_d[index]);
+            // printf("cursize is %d",cur_modified_size_d[0]);
             // printf("last is %d",last_modified_d[index]);
         }
     }

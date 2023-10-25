@@ -85,10 +85,10 @@ class IncFragmentBuilder {
     for (auto u_v_e : added_edges_) {
       auto& u = u_v_e.first;
       auto& v_edata_map = u_v_e.second;
-
       for (auto& v_e : v_edata_map) {
         auto v = v_e.first;
         auto& edata = v_e.second;
+        // LOG(INFO) << "edata is "<<edata;
 
         edges.template emplace_back(u, v, edata);
       }
@@ -101,9 +101,8 @@ class IncFragmentBuilder {
       auto u_gid = fragment_->Vertex2Gid(u);
       auto u_it = deleted_edges_.find(u_gid);
       auto uve = added_edges_.find(u_gid);
-
+      // if(u.GetValue() / 1000 == 27163)LOG(INFO) << "u is "<<u.GetValue();
       vertices.template emplace_back(u_gid, fragment_->GetData(u));
-
       for (auto& e : fragment_->GetOutgoingAdjList(u)) {
         auto v = e.neighbor;
         auto v_gid = fragment_->Vertex2Gid(v);
@@ -124,10 +123,12 @@ class IncFragmentBuilder {
         }
       }
     }
+    LOG(INFO) << "yes";
 
     auto new_frag = std::make_shared<FRAG_T>(vm_ptr);
 
     new_frag->Init(fragment_->fid(), vertices, edges);
+    LOG(INFO) << "yes";
     return new_frag;
   }
 
